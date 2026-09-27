@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 
 @theme {
   --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -24,6 +24,27 @@
   --color-text-primary: #F8FAFC;
   --color-text-secondary: #94A3B8;
   --color-text-tertiary: #64748B;
+
+  /* Stitch Design System Tokens */
+  --color-surface: #121316;
+  --color-surface-low: #17181c;
+  --color-surface-container: #1b1b1f;
+  --color-surface-high: #24252a;
+  --color-surface-highest: #2e2f36;
+  --color-primary: #d2bbff;
+  --color-primary-container: #7c3aed;
+  --color-primary-glow: #a855f7;
+  --color-tertiary: #7bd0ff;
+  --color-tertiary-container: #006e95;
+  --color-outline: #8b8596;
+  --color-outline-variant: #34353d;
+  --color-on-surface: #f1f0f5;
+  --color-on-surface-variant: #b5b0c0;
+  --color-success: #10b981;
+  --color-success-container: #064e3b;
+  --color-danger: #ef4444;
+  --color-danger-container: #7f1d1d;
+  --color-cyan: #06b6d4;
 }
 
 @keyframes marquee {
@@ -34,6 +55,15 @@
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+@keyframes pulse-scan {
+  0%, 100% { opacity: 0.35; transform: scaleX(0.98); }
+  50% { opacity: 0.9; transform: scaleX(1); }
+}
+
+.animate-scan-glow {
+  animation: pulse-scan 2.4s ease-in-out infinite;
 }
 
 .animate-marquee {
