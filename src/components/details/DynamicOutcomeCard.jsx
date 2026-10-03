@@ -1,7 +1,6 @@
-﻿export default function DynamicOutcomeCard({ mode, invariants }) {
+export default function DynamicOutcomeCard({ mode, invariants }) {
   const isVerifying = mode === "verifying"
   const isPassed = mode === "passed"
-  const isMismatch = mode === "mismatch" || !invariants.recipient
   const isExpired = mode === "expired" || !invariants.deadline
 
   let failReasonBadge = "Recipient mismatch"

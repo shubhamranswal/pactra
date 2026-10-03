@@ -1,15 +1,6 @@
-﻿import { useState } from "react"
 import { Link } from "react-router-dom"
 
 export default function PactHeader({ pactId = "P-1024", mode }) {
-  const [copied, setCopied] = useState(false)
-
-  const handleCopy = (text) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
   return (
     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-outline-variant/40 pb-5">
       <div className="flex flex-col gap-2">
