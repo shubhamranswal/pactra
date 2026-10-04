@@ -1,47 +1,51 @@
 import { Link } from "react-router-dom"
 
-export default function PactTable({ pacts }) {
+export default function PactTable({ pacts, isLoading = false, isError = false, errorMessage = "", onRetry }) {
   const getStatusBadge = (status) => {
-    switch (status) {
-      case "executing":
-        return (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#38BDF8]/20 border border-[#38BDF8]/30 text-[#38BDF8] font-mono text-xs font-medium shadow-[0_0_16px_-4px_rgba(56,189,248,0.25)]">
-            <svg className="animate-spin h-3 w-3 text-[#38BDF8]" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor" />
-            </svg>
-            <span>Executing</span>
-          </div>
-        )
-      case "settling":
-        return (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#7C3AED]/20 border border-[#7C3AED]/30 text-[#D2BBFF] font-mono text-xs font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#7C3AED] animate-pulse"></span>
-            <span>Settling</span>
-          </div>
-        )
-      case "verified":
-      case "completed":
-        return (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#10B981]/20 border border-[#10B981]/30 text-[#10B981] font-mono text-xs font-medium shadow-sm">
-            <span className="material-symbols-outlined text-[14px]">check</span>
-            <span>Verified</span>
-          </div>
-        )
-      case "disputed":
-        return (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#F43F5E]/20 border border-[#F43F5E]/30 text-[#F43F5E] font-mono text-xs font-medium shadow-sm">
-            <span className="material-symbols-outlined text-[14px]">warning</span>
-            <span>Disputed</span>
-          </div>
-        )
-      default:
-        return (
-          <span className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs font-mono text-[#94A3B8]">
-            {status}
-          </span>
-        )
+    // Status 0: Funded
+    if (status === 0 || status === "0" || status === "funded" || status === "settling") {
+      return (
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#7C3AED]/20 border border-[#7C3AED]/30 text-[#D2BBFF] font-mono text-xs font-medium">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#7C3AED] animate-pulse"></span>
+          <span>Funded</span>
+        </div>
+      )
     }
+    // Status 1: Submitted / Executing
+    if (status === 1 || status === "1" || status === "submitted" || status === "executing") {
+      return (
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#38BDF8]/20 border border-[#38BDF8]/30 text-[#38BDF8] font-mono text-xs font-medium shadow-[0_0_16px_-4px_rgba(56,189,248,0.25)]">
+          <svg className="animate-spin h-3 w-3 text-[#38BDF8]" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor" />
+          </svg>
+          <span>Submitted</span>
+        </div>
+      )
+    }
+    // Status 2: Settled / Verified
+    if (status === 2 || status === "2" || status === "settled" || status === "verified" || status === "completed") {
+      return (
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#10B981]/20 border border-[#10B981]/30 text-[#10B981] font-mono text-xs font-medium shadow-sm">
+          <span className="material-symbols-outlined text-[14px]">check</span>
+          <span>Settled</span>
+        </div>
+      )
+    }
+    // Status 3: Refunded / Disputed
+    if (status === 3 || status === "3" || status === "refunded" || status === "disputed") {
+      return (
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#F43F5E]/20 border border-[#F43F5E]/30 text-[#F43F5E] font-mono text-xs font-medium shadow-sm">
+          <span className="material-symbols-outlined text-[14px]">undo</span>
+          <span>Refunded</span>
+        </div>
+      )
+    }
+    return (
+      <span className="px-2 py-1 rounded bg-white/5 border border-white/10 text-xs font-mono text-[#94A3B8]">
+        {status}
+      </span>
+    )
   }
 
   return (
@@ -59,10 +63,47 @@ export default function PactTable({ pacts }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5 font-sans text-sm text-[#F8FAFC]">
-            {pacts.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan="5" className="py-12 text-center text-[#94A3B8] font-mono text-xs">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <div className="w-8 h-8 rounded-full border-2 border-[#7C3AED]/20 border-t-[#7C3AED] animate-spin"></div>
+                    <span>Querying Monad Testnet pact ledger...</span>
+                  </div>
+                </td>
+              </tr>
+            ) : isError ? (
+              <tr>
+                <td colSpan="5" className="py-10 text-center text-rose-300 font-mono text-xs">
+                  <div className="flex flex-col items-center justify-center gap-3">
+                    <span className="material-symbols-outlined text-rose-400 text-[24px]">wifi_off</span>
+                    <span>Failed to query on-chain pacts from Monad Testnet.</span>
+                    {errorMessage && <span className="text-[11px] text-[#64748B] max-w-md truncate">{errorMessage}</span>}
+                    {onRetry && (
+                      <button
+                        onClick={onRetry}
+                        className="px-3 py-1.5 rounded-lg bg-[#7C3AED]/20 hover:bg-[#7C3AED]/40 text-[#D2BBFF] border border-[#7C3AED]/40 transition-colors cursor-pointer"
+                      >
+                        Retry Query
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ) : pacts.length === 0 ? (
               <tr>
                 <td colSpan="5" className="py-12 text-center text-[#64748B] font-mono text-xs">
-                  No pacts found matching filter criteria.
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <span className="material-symbols-outlined text-[24px] text-[#64748B]">search_off</span>
+                    <span>No on-chain pacts found matching filter criteria.</span>
+                    <Link
+                      to="/create-agreement"
+                      className="mt-1 text-xs text-[#7C3AED] hover:underline flex items-center gap-1"
+                    >
+                      <span>Create an escrow pact</span>
+                      <span className="material-symbols-outlined text-[13px]">arrow_forward</span>
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ) : (
@@ -143,11 +184,28 @@ export default function PactTable({ pacts }) {
         </table>
       </div>
 
-      {/* Mobile Stacked Card View (Matching Stitch screen 0e370d3c) */}
+      {/* Mobile Stacked Card View */}
       <div className="md:hidden p-4 flex flex-col gap-3">
-        {pacts.length === 0 ? (
+        {isLoading ? (
+          <div className="py-10 text-center text-[#94A3B8] font-mono text-xs flex flex-col items-center gap-2">
+            <div className="w-6 h-6 rounded-full border-2 border-[#7C3AED]/20 border-t-[#7C3AED] animate-spin"></div>
+            <span>Loading on-chain pacts...</span>
+          </div>
+        ) : isError ? (
+          <div className="py-8 text-center text-rose-300 font-mono text-xs flex flex-col items-center gap-2">
+            <span>Failed to query on-chain pacts.</span>
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="px-3 py-1.5 rounded-lg bg-[#7C3AED]/20 text-[#D2BBFF] border border-[#7C3AED]/40 text-xs"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        ) : pacts.length === 0 ? (
           <div className="py-10 text-center text-[#64748B] font-mono text-xs">
-            No pacts found matching filter criteria.
+            No on-chain pacts found matching filter criteria.
           </div>
         ) : (
           pacts.map((pact) => (

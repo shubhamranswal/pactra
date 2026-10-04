@@ -5,84 +5,61 @@ import DashboardStats from "../components/dashboard/DashboardStats"
 import DashboardFilters from "../components/dashboard/DashboardFilters"
 import PactTable from "../components/dashboard/PactTable"
 import ActivityStream from "../components/dashboard/ActivityStream"
-
-const MOCK_PACTS = [
-  {
-    id: "P-1024",
-    title: "Sub-second Escrow",
-    routingToken: "5 MON",
-    beneficiary: "0x71...A92",
-    amount: "100 USDC",
-    oracleSpec: "Oracle: Pyth Monad Feed",
-    status: "executing",
-  },
-  {
-    id: "P-1023",
-    title: "State Transition Settled",
-    routingToken: "100 USDC",
-    beneficiary: "0x82...C14",
-    amount: "250 USDC",
-    oracleSpec: "Finalized in 410ms",
-    status: "verified",
-  },
-  {
-    id: "P-1022",
-    title: "Arbitration Window Active",
-    routingToken: "Pay Agent C",
-    beneficiary: "0x4f...E91",
-    amount: "150 USDC",
-    oracleSpec: "Locked in Dispute Escrow",
-    status: "disputed",
-  },
-  {
-    id: "P-1021",
-    title: "Inference SLA Vault",
-    routingToken: "25 MON",
-    beneficiary: "0x9a...D42",
-    amount: "500 USDC",
-    oracleSpec: "zkSNARK Groth16 Verified",
-    status: "verified",
-  },
-  {
-    id: "P-1020",
-    title: "Parallel BFT Channel",
-    routingToken: "50 MON",
-    beneficiary: "0x12...B83",
-    amount: "1,200 USDC",
-    oracleSpec: "Epoch #84918 Attested",
-    status: "settling",
-  },
-]
+import { usePacts } from "../hooks/usePacts"
+import { useWallet } from "../hooks/useWallet"
 
 export default function Dashboard() {
   const [activeFilter, setActiveFilter] = useState("all")
   const [searchQuery, setSearchQuery] = useState("")
 
+  const { pacts, totalCount, isLoading, isError, error, refetch, stats } = usePacts()
+  const { address, isConnected } = useWallet()
+
   const filteredPacts = useMemo(() => {
-    return MOCK_PACTS.filter((pact) => {
-      // Category filtering
+    return pacts.filter((pact) => {
+      // Category / Lifecycle filtering
       if (activeFilter === "settling") {
-        if (pact.status !== "settling" && pact.status !== "executing") return false
-      } else if (activeFilter === "disputed") {
-        if (pact.status !== "disputed") return false
+        // Active pacts in progress: Funded (0) or Submitted (1)
+        if (pact.status !== 0 && pact.status !== 1) return false
       } else if (activeFilter === "completed") {
-        if (pact.status !== "verified" && pact.status !== "completed") return false
+        // Settled pacts: Settled (2)
+        if (pact.status !== 2) return false
+      } else if (activeFilter === "disputed") {
+        // Refunded pacts: Refunded (3)
+        if (pact.status !== 3) return false
+      } else if (activeFilter === "my-pacts") {
+        // Filter by connected wallet address
+        if (!address) return false
+        const userAddr = address.toLowerCase()
+        const matchCreator = pact.creator?.toLowerCase() === userAddr
+        const matchRecipient = pact.recipient?.toLowerCase() === userAddr
+        if (!matchCreator && !matchRecipient) return false
       }
 
       // Search query filtering
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
         const matchId = pact.id.toLowerCase().includes(query)
-        const matchTitle = pact.title.toLowerCase().includes(query)
-        const matchBeneficiary = pact.beneficiary.toLowerCase().includes(query)
-        const matchAmount = pact.amount.toLowerCase().includes(query)
-        const matchToken = pact.routingToken.toLowerCase().includes(query)
-        return matchId || matchTitle || matchBeneficiary || matchAmount || matchToken
+        const matchTitle = pact.title?.toLowerCase().includes(query)
+        const matchBeneficiary = pact.beneficiary?.toLowerCase().includes(query)
+        const matchRecipient = pact.recipient?.toLowerCase().includes(query)
+        const matchCreator = pact.creator?.toLowerCase().includes(query)
+        const matchAmount = pact.amount?.toLowerCase().includes(query)
+        const matchToken = pact.routingToken?.toLowerCase().includes(query)
+        return (
+          matchId ||
+          matchTitle ||
+          matchBeneficiary ||
+          matchRecipient ||
+          matchCreator ||
+          matchAmount ||
+          matchToken
+        )
       }
 
       return true
     })
-  }, [activeFilter, searchQuery])
+  }, [pacts, activeFilter, searchQuery, address])
 
   return (
     <MainLayout>
@@ -91,7 +68,7 @@ export default function Dashboard() {
         <DashboardHeader />
 
         {/* 2. 4 Top Analytical KPI Cards */}
-        <DashboardStats />
+        <DashboardStats stats={stats} />
 
         {/* 3. Main Active Pacts Data Grid with Filter Tabs & Search */}
         <div className="flex flex-col rounded-2xl bg-[#121316]/75 backdrop-blur-xl border border-white/10 overflow-hidden shadow-2xl">
@@ -100,13 +77,20 @@ export default function Dashboard() {
             setActiveFilter={setActiveFilter}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
-            totalCount={MOCK_PACTS.length}
+            totalCount={totalCount}
+            isConnected={isConnected}
           />
-          <PactTable pacts={filteredPacts} />
+          <PactTable
+            pacts={filteredPacts}
+            isLoading={isLoading}
+            isError={isError}
+            errorMessage={error?.shortMessage || error?.message || ""}
+            onRetry={refetch}
+          />
         </div>
 
         {/* 4. Recent Activity Stream & Consensus Telemetry Histogram */}
-        <ActivityStream />
+        <ActivityStream pacts={pacts} />
       </div>
     </MainLayout>
   )

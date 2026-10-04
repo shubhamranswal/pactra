@@ -1,44 +1,47 @@
 import { Link } from "react-router-dom"
 
-export default function ActivityStream() {
-  const activities = [
-    {
-      id: "P-1023",
-      title: "P-1023 verified",
-      time: "1m ago",
-      detailLabel: "Receipt:",
-      detailValue: "0x9e12...4f3a",
-      icon: "check",
-      iconBg: "bg-[#38BDF8]/20 border-[#38BDF8]/30 text-[#38BDF8]",
-    },
-    {
-      id: "P-1024",
-      title: "100 USDC settled",
-      time: "3m ago",
-      detailLabel: "Note:",
-      detailValue: "Instant disbursement to counterparty",
-      icon: "payments",
-      iconBg: "bg-[#6366F1]/20 border-[#6366F1]/30 text-[#C0C1FF]",
-    },
-    {
-      id: "P-1024",
-      title: "P-1024 executing",
-      time: "In Flight",
-      detailLabel: "Consensus:",
-      detailValue: "Monad-BFT consensus round #4901",
-      icon: "hourglass_empty",
-      iconBg: "bg-[#7C3AED]/20 border-[#7C3AED]/30 text-[#D2BBFF]",
-    },
-    {
-      id: "P-1022",
-      title: "P-1022 arbitration requested",
-      time: "14m ago",
-      detailLabel: "Oracle:",
-      detailValue: "Timeout threshold arbitration window",
-      icon: "warning",
-      iconBg: "bg-[#F43F5E]/20 border-[#F43F5E]/30 text-[#F43F5E]",
-    },
-  ]
+export default function ActivityStream({ pacts = [] }) {
+  const activities = pacts.length > 0
+    ? pacts.slice(0, 4).map((pact) => {
+        let icon = "lock"
+        let iconBg = "bg-[#7C3AED]/20 border-[#7C3AED]/30 text-[#D2BBFF]"
+
+        if (pact.status === 2) {
+          icon = "check"
+          iconBg = "bg-[#10B981]/20 border-[#10B981]/30 text-[#10B981]"
+        } else if (pact.status === 3) {
+          icon = "undo"
+          iconBg = "bg-[#F43F5E]/20 border-[#F43F5E]/30 text-[#F43F5E]"
+        } else if (pact.status === 1) {
+          icon = "assignment_turned_in"
+          iconBg = "bg-[#38BDF8]/20 border-[#38BDF8]/30 text-[#38BDF8]"
+        }
+
+        const timeStr = pact.createdAt
+          ? new Date(pact.createdAt * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+          : "On-Chain"
+
+        return {
+          id: pact.id,
+          title: `Pact #${pact.id} ${pact.statusLabel}`,
+          time: timeStr,
+          detailLabel: "Obligation:",
+          detailValue: `${pact.amountFormatted} MON → ${pact.beneficiary}`,
+          icon,
+          iconBg,
+        }
+      })
+    : [
+        {
+          id: "1",
+          title: "Waiting for on-chain events",
+          time: "Live Node",
+          detailLabel: "Status:",
+          detailValue: "Listening to PactEscrow contract",
+          icon: "sync",
+          iconBg: "bg-[#7C3AED]/20 border-[#7C3AED]/30 text-[#D2BBFF]",
+        },
+      ]
 
   // 24-bar simulated latency distribution
   const latencyBars = [
@@ -99,10 +102,10 @@ export default function ActivityStream() {
 
         <div className="pt-2 flex items-center justify-between text-xs border-t border-white/5">
           <Link
-            to="/agreement/P-1024"
+            to={pacts.length > 0 ? `/agreement/${pacts[0].id}` : "/agreement/1"}
             className="font-mono text-[11px] text-[#D2BBFF] hover:text-white flex items-center gap-1 transition-colors"
           >
-            <span>View Full Block Ledger</span>
+            <span>View Latest On-Chain Pact</span>
             <span className="material-symbols-outlined text-[13px]">north_east</span>
           </Link>
           <span className="font-mono text-[11px] text-[#38BDF8]">

@@ -6,12 +6,14 @@ export default function DashboardFilters({
   searchQuery,
   setSearchQuery,
   totalCount,
+  isConnected = false,
 }) {
   const filters = [
     { key: "all", label: `ALL (${totalCount})` },
-    { key: "settling", label: "SETTLING" },
-    { key: "disputed", label: "DISPUTED" },
-    { key: "completed", label: "COMPLETED" },
+    ...(isConnected ? [{ key: "my-pacts", label: "MY PACTS" }] : []),
+    { key: "settling", label: "ACTIVE" },
+    { key: "completed", label: "SETTLED" },
+    { key: "disputed", label: "REFUNDED" },
   ]
 
   return (
