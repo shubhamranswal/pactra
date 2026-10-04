@@ -5,12 +5,28 @@ export default function EscrowPreviewCard({
   collateral,
   timeout,
   onInitiatePact,
-  isProcessing,
+  isPending,
+  isConfirming,
+  isSuccess,
+  error,
+  isConnected,
+  isCorrectNetwork,
 }) {
   const isMon = token === "MON"
   const rate = isMon ? 4.28 : 1.0
   const numAmount = parseFloat(amount) || 0
   const usdValue = (numAmount * rate).toFixed(2)
+
+  const isProcessing = isPending || isConfirming
+
+  const getButtonText = () => {
+    if (!isConnected) return "Connect Wallet to Initiate"
+    if (!isCorrectNetwork) return "Switch to Monad Testnet"
+    if (isPending) return "Awaiting Wallet Confirmation..."
+    if (isConfirming) return "Confirming on Monad..."
+    if (isSuccess) return "Pact Created Successfully!"
+    return "Fund Escrow & Initiate Pact"
+  }
 
   return (
     <div className="bg-[#111318]/90 rounded-2xl p-5 sm:p-6 shadow-2xl border border-white/10 backdrop-blur-xl relative overflow-hidden flex flex-col gap-5 text-left">
@@ -59,7 +75,7 @@ export default function EscrowPreviewCard({
             arrow_forward
           </span>
           <span className="truncate">
-            {recipientAddress || "0x71C5A82d54B98819446D61BcA49A92"}
+            {recipientAddress || "0x..."}
           </span>
         </div>
       </div>
@@ -89,6 +105,14 @@ export default function EscrowPreviewCard({
           <span className="text-[#38BDF8] font-medium">100% Non-Custodial</span>
         </div>
       </div>
+
+      {/* Error Message Display */}
+      {error && (
+        <div className="p-3 rounded-xl bg-[#F43F5E]/10 border border-[#F43F5E]/30 text-[#F43F5E] text-xs font-mono flex items-start gap-2 relative z-10">
+          <span className="material-symbols-outlined text-[16px] shrink-0 mt-0.5">error</span>
+          <span className="break-words">{error}</span>
+        </div>
+      )}
 
       {/* Fee & Network Telemetry Breakdown */}
       <div className="space-y-2 pt-1 font-mono text-xs text-[#94A3B8] relative z-10">
@@ -124,12 +148,12 @@ export default function EscrowPreviewCard({
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path className="opacity-75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" fill="currentColor"></path>
               </svg>
-              <span>Compiling Escrow Bytecode...</span>
+              <span>{getButtonText()}</span>
             </>
           ) : (
             <>
               <span className="material-symbols-outlined text-[18px]">lock_open</span>
-              <span>Fund Escrow &amp; Initiate Pact</span>
+              <span>{getButtonText()}</span>
             </>
           )}
         </button>

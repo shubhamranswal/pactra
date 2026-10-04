@@ -3,6 +3,10 @@ import { Link } from "react-router-dom"
 export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
   if (!isOpen) return null
 
+  const pactId = pactDetails?.createdPactId ? `#P-${pactDetails.createdPactId}` : "#P-1025"
+  const txHash = pactDetails?.transactionHash || ""
+  const explorerUrl = txHash ? `https://testnet.monadexplorer.com/tx/${txHash}` : "#"
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
       <div className="relative w-full max-w-lg rounded-2xl bg-[#14151A] border border-white/15 shadow-2xl p-6 sm:p-8 overflow-hidden text-left flex flex-col gap-5">
@@ -17,7 +21,7 @@ export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
             </div>
             <div>
               <h3 className="font-display text-lg sm:text-xl font-bold text-white">
-                Pact Specification Ready
+                Pact Successfully Created
               </h3>
               <span className="font-mono text-xs text-[#38BDF8]">
                 Monad Testnet • Autonomous Non-Custodial Vault
@@ -26,7 +30,7 @@ export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#94A3B8] hover:text-white hover:bg-white/10 transition-colors"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-[#94A3B8] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -36,7 +40,7 @@ export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
         <div className="rounded-xl bg-[#0D0E11] p-4 border border-white/10 flex flex-col gap-2.5 font-mono text-xs text-[#94A3B8] relative z-10">
           <div className="flex justify-between items-center">
             <span>Pact Identifier:</span>
-            <span className="text-[#D2BBFF] font-semibold">#P-1025 (Draft)</span>
+            <span className="text-[#D2BBFF] font-semibold">{pactId}</span>
           </div>
           <div className="flex justify-between items-center">
             <span>Disbursement Amount:</span>
@@ -50,24 +54,34 @@ export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
             <span>Timelock Expiry:</span>
             <span className="text-[#38BDF8]">{pactDetails.timeout}</span>
           </div>
-          <div className="flex justify-between items-center">
-            <span>Invariants Configured:</span>
-            <span className="text-[#10B981] font-semibold">{pactDetails.invariantsCount} Active</span>
-          </div>
+          {txHash && (
+            <div className="flex justify-between items-center pt-2 border-t border-white/5">
+              <span>Transaction Hash:</span>
+              <a
+                href={explorerUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="text-[#38BDF8] hover:underline truncate max-w-[180px] flex items-center gap-1"
+              >
+                <span>{txHash.slice(0, 10)}...{txHash.slice(-8)}</span>
+                <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+              </a>
+            </div>
+          )}
         </div>
 
         {/* Notice text */}
         <p className="font-sans text-xs text-[#94A3B8] leading-relaxed relative z-10">
-          Frontend escrow configuration generated successfully. In live production, this compiles to Monad bytecode and emits a signed state channel event.
+          On-chain escrow pact has been confirmed on Monad Testnet. Native MON collateral is safely held in the contract.
         </p>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 relative z-10">
           <Link
-            to="/agreement/P-1024"
+            to={`/agreement/${pactDetails.createdPactId || 'P-1024'}`}
             className="w-full sm:w-auto flex-1 py-2.5 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-sans text-xs sm:text-sm font-semibold text-center shadow-[0_0_20px_rgba(124,58,237,0.4)] transition-all flex items-center justify-center gap-1.5"
           >
-            <span>Inspect Live Pact #P-1024</span>
+            <span>Inspect Pact {pactId}</span>
             <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
           </Link>
           <Link

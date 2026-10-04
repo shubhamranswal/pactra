@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { parseEther, isAddress } from "viem"
 import MainLayout from "../layouts/MainLayout"
 import CreatePactHeader from "../components/create/CreatePactHeader"
 import ArchitectureSelector from "../components/create/ArchitectureSelector"
@@ -6,6 +7,9 @@ import AgentFormFields from "../components/create/AgentFormFields"
 import InvariantsManager from "../components/create/InvariantsManager"
 import EscrowPreviewCard from "../components/create/EscrowPreviewCard"
 import PactCreatedModal from "../components/create/PactCreatedModal"
+import { useWallet } from "../hooks/useWallet"
+import { useCreatePact } from "../hooks/useCreatePact"
+import { isPactEscrowConfigured } from "../config/contracts"
 
 const DEFAULT_INVARIANTS = [
   { id: 1, label: "Sender Auth", satisfied: true, removable: false },
@@ -16,6 +20,48 @@ const DEFAULT_INVARIANTS = [
   { id: 6, label: "TX Success / Merkle Root", satisfied: true, removable: false },
 ]
 
+function getTimeoutDurationInSeconds(timeoutStr) {
+  if (!timeoutStr) return 86400
+  const lower = timeoutStr.toString().toLowerCase()
+  if (lower.includes("12 hour") || lower.includes("12h")) return 12 * 3600
+  if (lower.includes("24 hour") || lower.includes("24h")) return 24 * 3600
+  if (lower.includes("48 hour") || lower.includes("48h")) return 48 * 3600
+  if (lower.includes("7 day") || lower.includes("7d")) return 7 * 86400
+  const match = lower.match(/(\d+)/)
+  if (match) {
+    const num = parseInt(match[1], 10)
+    if (lower.includes("day")) return num * 86400
+    if (lower.includes("hour")) return num * 3600
+    if (lower.includes("min")) return num * 60
+    return num * 3600
+  }
+  return 86400
+}
+
+function formatErrorMessage(err) {
+  if (!err) return null
+  const msg = typeof err === "string" ? err : err.message || ""
+  if (msg.includes("User rejected") || msg.includes("user rejected") || msg.includes("User denied")) {
+    return "Transaction request rejected in wallet."
+  }
+  if (msg.includes("insufficient funds") || msg.includes("exceeds the balance")) {
+    return "Insufficient MON balance in your wallet for escrow amount + gas fee."
+  }
+  if (msg.includes("InvalidRecipient") || msg.includes("recipient")) {
+    return "Invalid recipient address or self-recipient not allowed."
+  }
+  if (msg.includes("InvalidDeadline") || msg.includes("deadline")) {
+    return "Invalid deadline timestamp provided."
+  }
+  if (msg.includes("ZeroEscrowAmount")) {
+    return "Escrow amount must be greater than zero."
+  }
+  if (msg.includes("configured")) {
+    return "PactEscrow contract address is missing in VITE_PACT_ESCROW_ADDRESS environment variable."
+  }
+  return msg.split("\n")[0].substring(0, 160)
+}
+
 export default function CreateAgreement() {
   const [selectedArchitecture, setSelectedArchitecture] = useState("MON")
   const [providerAgent, setProviderAgent] = useState("PaymentAgent-B")
@@ -25,8 +71,23 @@ export default function CreateAgreement() {
   const [timeout, setTimeoutHours] = useState("24 Hours")
   const [collateral, setCollateral] = useState("100 USDC")
   const [invariants, setInvariants] = useState(DEFAULT_INVARIANTS)
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false)
+  const [validationError, setValidationError] = useState("")
+  const [modalDismissed, setModalDismissed] = useState(false)
+
+  const { address, isConnected, isCorrectNetwork } = useWallet()
+
+  const {
+    createPact,
+    transactionHash,
+    createdPactId,
+    isPending,
+    isConfirming,
+    isSuccess,
+    error: contractError,
+    reset,
+  } = useCreatePact()
+
+  const isSuccessModalOpen = isSuccess && !modalDismissed
 
   const handleSelectArchitecture = (archId, defaultToken) => {
     setSelectedArchitecture(archId)
@@ -50,13 +111,59 @@ export default function CreateAgreement() {
     setInvariants((prev) => prev.filter((inv) => inv.id !== id))
   }
 
-  const handleInitiatePact = () => {
-    setIsProcessing(true)
-    setTimeout(() => {
-      setIsProcessing(false)
-      setIsSuccessModalOpen(true)
-    }, 800)
+  const handleInitiatePact = async () => {
+    setValidationError("")
+    setModalDismissed(false)
+    reset()
+
+    if (!isPactEscrowConfigured) {
+      setValidationError("PactEscrow contract address is missing in VITE_PACT_ESCROW_ADDRESS.")
+      return
+    }
+
+    if (!isConnected || !address) {
+      setValidationError("Please connect your wallet first.")
+      return
+    }
+
+    if (!isCorrectNetwork) {
+      setValidationError("Please switch your wallet to Monad Testnet.")
+      return
+    }
+
+    if (!isAddress(recipientAddress, { strict: false })) {
+      setValidationError("Please enter a valid recipient EVM address.")
+      return
+    }
+
+    if (recipientAddress.toLowerCase() === address.toLowerCase()) {
+      setValidationError("Recipient cannot be your own connected wallet address.")
+      return
+    }
+
+    const numAmount = parseFloat(amount)
+    if (isNaN(numAmount) || numAmount <= 0) {
+      setValidationError("Escrow amount must be greater than 0.")
+      return
+    }
+
+    const durationSeconds = getTimeoutDurationInSeconds(timeout)
+    const currentTimestampSeconds = Math.floor(Date.now() / 1000)
+    const deadlineSeconds = currentTimestampSeconds + durationSeconds
+
+    try {
+      const valueWei = parseEther(amount.toString())
+      await createPact({
+        recipient: recipientAddress,
+        deadlineSeconds,
+        valueWei,
+      })
+    } catch (err) {
+      console.error("Contract call failed:", err)
+    }
   }
+
+  const displayError = validationError || formatErrorMessage(contractError)
 
   return (
     <MainLayout>
@@ -100,7 +207,7 @@ export default function CreateAgreement() {
               />
             </div>
 
-            {/* Inline Architecture Pre-flight Indicator (from Stitch) */}
+            {/* Inline Architecture Pre-flight Indicator */}
             <div className="bg-[#0D0E11]/90 border border-white/10 rounded-xl p-4 shadow-lg flex items-center justify-between backdrop-blur-md text-left flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <div className="relative w-10 h-10 flex items-center justify-center shrink-0">
@@ -127,7 +234,7 @@ export default function CreateAgreement() {
             </div>
           </div>
 
-          {/* Right Column: Execution Preview & Fund Escrow CTA (5 cols, sticky on desktop) */}
+          {/* Right Column: Execution Preview & Fund Escrow CTA */}
           <div className="lg:col-span-5 lg:sticky lg:top-24">
             <EscrowPreviewCard
               amount={amount}
@@ -136,7 +243,12 @@ export default function CreateAgreement() {
               collateral={collateral}
               timeout={timeout}
               onInitiatePact={handleInitiatePact}
-              isProcessing={isProcessing}
+              isPending={isPending}
+              isConfirming={isConfirming}
+              isSuccess={isSuccess}
+              error={displayError}
+              isConnected={isConnected}
+              isCorrectNetwork={isCorrectNetwork}
             />
           </div>
         </div>
@@ -144,8 +256,10 @@ export default function CreateAgreement() {
         {/* Frontend Success / Review Modal */}
         <PactCreatedModal
           isOpen={isSuccessModalOpen}
-          onClose={() => setIsSuccessModalOpen(false)}
+          onClose={() => setModalDismissed(true)}
           pactDetails={{
+            createdPactId,
+            transactionHash,
             amount,
             token,
             recipientAddress,
