@@ -1,8 +1,10 @@
-﻿import { useState } from "react"
+import { useState } from "react"
+import { PACT_ESCROW_ADDRESS } from "../../config/contracts"
+import { shortenAddress } from "../../utils/address"
 
 export default function TelemetryStrip() {
   const [copied, setCopied] = useState(false)
-  const contractAddr = "0x9b4c09d8131238914ef"
+  const contractAddr = PACT_ESCROW_ADDRESS || "0x3d22Dc20a9Ff29Fd4EbbCD5B380e8d641eA577ce"
 
   const handleCopy = () => {
     navigator.clipboard.writeText(contractAddr)
@@ -37,7 +39,7 @@ export default function TelemetryStrip() {
       </div>
 
       <div className="flex items-center gap-2">
-        <span>Contract: 0x9b4c...14ef</span>
+        <span>Contract: {shortenAddress(contractAddr)}</span>
         <button
           onClick={handleCopy}
           className="hover:text-white transition-colors cursor-pointer"

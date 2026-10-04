@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom"
 import { shortenAddress } from "../../utils/address"
 
-export default function PactHeader({ pact, pactId = "P-1024", mode, isDemo = false }) {
-  const displayId = pact?.id ? `#P-${pact.id}` : (pactId.startsWith("#") ? pactId : `#${pactId}`)
-  const amountText = pact ? `${pact.amountFormatted} MON` : "5 MON"
-  const recipientText = pact?.recipient ? shortenAddress(pact.recipient) : "0x7099...79C8"
+export default function PactHeader({ pact, pactId, mode, isDemo = false }) {
+  const rawId = pact?.id || (pactId ? String(pactId).replace(/^[#P-]+/, "") : "")
+  const displayId = rawId ? `#${rawId}` : ""
+  const amountText = pact ? `${pact.amountFormatted} MON` : (isDemo ? "5 MON" : "—")
+  const recipientText = pact?.recipient ? shortenAddress(pact.recipient) : (isDemo ? "0x7099...79C8" : "—")
 
   const statusLabel = pact ? pact.statusLabel.toUpperCase() : mode.toUpperCase()
 
@@ -35,40 +36,51 @@ export default function PactHeader({ pact, pactId = "P-1024", mode, isDemo = fal
           </h1>
 
           {/* Dynamic Main Status Badge */}
-          {mode === "verifying" && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary-container/25 border border-primary/50 text-primary shadow-[0_0_20px_rgba(124,58,237,0.45)]">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-85"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
-              </span>
+          {pact && !isDemo ? (
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full border shadow-sm ${pact.statusInfo.badgeClass}`}>
+              <span className="material-symbols-outlined text-[15px]">{pact.statusInfo.icon}</span>
               <span className="font-mono text-xs tracking-wider uppercase font-bold text-white">
-                {pact ? pact.statusLabel.toUpperCase() : "VERIFYING"}
+                {pact.statusLabel}
               </span>
             </div>
-          )}
+          ) : (
+            <>
+              {mode === "verifying" && (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary-container/25 border border-primary/50 text-primary shadow-[0_0_20px_rgba(124,58,237,0.45)]">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-tertiary opacity-85"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+                  </span>
+                  <span className="font-mono text-xs tracking-wider uppercase font-bold text-white">
+                    VERIFYING
+                  </span>
+                </div>
+              )}
 
-          {mode === "passed" && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-success/60 text-emerald-300 shadow-[0_0_20px_rgba(160,185,129,0.45)]">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
-              </span>
-              <span className="font-mono text-xs tracking-wider uppercase font-bold text-white">
-                SETTLED
-              </span>
-            </div>
-          )}
+              {mode === "passed" && (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-success/60 text-emerald-300 shadow-[0_0_20px_rgba(160,185,129,0.45)]">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-400"></span>
+                  </span>
+                  <span className="font-mono text-xs tracking-wider uppercase font-bold text-white">
+                    SETTLED
+                  </span>
+                </div>
+              )}
 
-          {(mode === "mismatch" || mode === "expired") && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-danger/20 border border-danger/60 text-danger shadow-[0_0_20px_rgba(239,68,68,0.45)]">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger opacity-60"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-danger"></span>
-              </span>
-              <span className="font-mono text-xs tracking-wider uppercase font-bold text-white">
-                {mode === "expired" ? "EXPIRED / REFUNDED" : "REVERTED / REFUNDED"}
-              </span>
-            </div>
+              {(mode === "mismatch" || mode === "expired") && (
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-danger/20 border border-danger/60 text-danger shadow-[0_0_20px_rgba(239,68,68,0.45)]">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger opacity-60"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-danger"></span>
+                  </span>
+                  <span className="font-mono text-xs tracking-wider uppercase font-bold text-white">
+                    {mode === "expired" ? "EXPIRED / REFUNDED" : "REVERTED / REFUNDED"}
+                  </span>
+                </div>
+              )}
+            </>
           )}
 
           {isDemo ? (

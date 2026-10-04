@@ -6,8 +6,8 @@ export default function BlockchainTxCard({ pact, transactionHash, isDemo = false
   const [copiedHash, setCopiedHash] = useState(false)
   const [copiedContract, setCopiedContract] = useState(false)
 
-  // Use real transaction hash if available, or contract address
-  const activeTxHash = transactionHash || (isDemo ? "0x82af5c7198bb492a91bd" : null)
+  // Use real transaction hash if available; never fabricate hash for real pact
+  const activeTxHash = transactionHash || (isDemo && !pact ? "0x82af5c7198bb492a91bd" : null)
   const contractAddr = PACT_ESCROW_ADDRESS || "0x3d22Dc20a9Ff29Fd4EbbCD5B380e8d641eA577ce"
 
   const handleCopyHash = () => {
@@ -35,7 +35,7 @@ export default function BlockchainTxCard({ pact, transactionHash, isDemo = false
           <h3 className="font-display text-base font-semibold text-white">Blockchain Record</h3>
         </div>
         <div className="flex items-center gap-1.5">
-          {isDemo ? (
+          {isDemo && !pact ? (
             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30">
               SIMULATED
             </span>
@@ -80,7 +80,7 @@ export default function BlockchainTxCard({ pact, transactionHash, isDemo = false
         {activeTxHash ? (
           <div className="flex items-center justify-between py-1 border-b border-outline-variant/20">
             <span className="text-outline">
-              {isDemo ? "Tx Hash (Demo)" : "Creation Tx"}
+              {isDemo && !pact ? "Tx Hash (Demo)" : "Creation Tx"}
             </span>
             <div className="flex items-center gap-1.5 text-white font-semibold">
               <span>{activeTxHash.slice(0, 10)}...{activeTxHash.slice(-6)}</span>
@@ -97,9 +97,9 @@ export default function BlockchainTxCard({ pact, transactionHash, isDemo = false
           </div>
         ) : (
           <div className="flex items-center justify-between py-1 border-b border-outline-variant/20">
-            <span className="text-outline">Pact Storage</span>
-            <span className="text-on-surface-variant font-medium">
-              Contract Slot State Verified
+            <span className="text-outline">Creation Tx</span>
+            <span className="text-outline font-medium text-[11px]">
+              Direct session • state loaded from storage
             </span>
           </div>
         )}

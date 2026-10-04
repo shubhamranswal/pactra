@@ -45,7 +45,7 @@ export default function Navbar() {
               Dashboard
             </Link>
             <Link
-              to="/agreement/P-1024"
+              to="/agreement/1"
               className={`h-16 flex items-center text-sm font-medium transition-colors gap-1.5 border-b-2 ${
                 isActive("/agreement")
                   ? "text-[#D2BBFF] border-[#7C3AED]"
@@ -54,7 +54,7 @@ export default function Navbar() {
             >
               <span>Pacts</span>
               <span className="font-mono text-[10px] text-[#38BDF8] bg-[#38BDF8]/10 px-1.5 py-0.5 rounded border border-[#38BDF8]/20">
-                #P-1024
+                #1
               </span>
             </Link>
           </nav>
@@ -284,7 +284,7 @@ export default function Navbar() {
             <span className="material-symbols-outlined text-[16px]">insights</span>
           </Link>
           <Link
-            to="/agreement/P-1024"
+            to="/agreement/1"
             onClick={() => setMobileMenuOpen(false)}
             className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-between ${
               isActive("/agreement")
@@ -292,7 +292,7 @@ export default function Navbar() {
                 : "text-[#94A3B8] hover:bg-white/5 hover:text-white"
             }`}
           >
-            <span>Pact Details (#P-1024)</span>
+            <span>Pact Details (#1)</span>
             <span className="font-mono text-[10px] text-[#38BDF8] bg-[#38BDF8]/10 px-1.5 py-0.5 rounded border border-[#38BDF8]/20">
               LIVE
             </span>

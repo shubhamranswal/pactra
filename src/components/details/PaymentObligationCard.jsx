@@ -1,27 +1,30 @@
 import { useState } from "react"
 import { shortenAddress } from "../../utils/address"
 
-export default function PaymentObligationCard({ pact, pactId = "P-1024", isDemo = false }) {
+export default function PaymentObligationCard({ pact, pactId, isDemo = false }) {
   const [copiedRecipient, setCopiedRecipient] = useState(false)
   const [copiedCreator, setCopiedCreator] = useState(false)
   const [copiedEvidence, setCopiedEvidence] = useState(false)
 
-  // Real or demo data
-  const creatorAddr = pact?.creator || "0x8192A4789Bc09F32dE09B18a478cbed5efcaE784"
-  const recipientAddr = pact?.recipient || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
-  const amountDisplay = pact ? `${pact.amountFormatted} MON` : "5 MON"
-  const deadlineDisplay = pact?.deadlineFormatted || "18:00 UTC"
-  const createdAtDisplay = pact?.createdAtFormatted || "At Genesis"
+  // Real contract data (fallback strictly isolated to explicit demo simulation mode)
+  const creatorAddr = pact?.creator || (isDemo ? "0x8192A4789Bc09F32dE09B18a478cbed5efcaE784" : "")
+  const recipientAddr = pact?.recipient || (isDemo ? "0x70997970C51812dc3A010C7d01b50e0d17dc79C8" : "")
+  const amountDisplay = pact ? `${pact.amountFormatted} MON` : (isDemo ? "5 MON" : "—")
+  const deadlineDisplay = pact?.deadlineFormatted || (isDemo ? "18:00 UTC" : "—")
+  const createdAtDisplay = pact?.createdAtFormatted || (isDemo ? "At Genesis" : "—")
+  const submittedAtDisplay = pact?.submittedAtFormatted || null
   const evidenceHash = pact?.evidenceHash || ""
   const hasEvidence = pact?.hasEvidence
 
   const handleCopyRecipient = () => {
+    if (!recipientAddr) return
     navigator.clipboard.writeText(recipientAddr)
     setCopiedRecipient(true)
     setTimeout(() => setCopiedRecipient(false), 2000)
   }
 
   const handleCopyCreator = () => {
+    if (!creatorAddr) return
     navigator.clipboard.writeText(creatorAddr)
     setCopiedCreator(true)
     setTimeout(() => setCopiedCreator(false), 2000)
@@ -33,6 +36,8 @@ export default function PaymentObligationCard({ pact, pactId = "P-1024", isDemo 
     setCopiedEvidence(true)
     setTimeout(() => setCopiedEvidence(false), 2000)
   }
+
+  const numericPactId = pact?.id || (pactId ? String(pactId).replace(/^[#P-]+/, "") : "")
 
   return (
     <div className="rounded-xl bg-surface-low border border-outline-variant/50 p-5 shadow-lg flex flex-col gap-4 relative overflow-hidden text-left">
@@ -47,9 +52,11 @@ export default function PaymentObligationCard({ pact, pactId = "P-1024", isDemo 
               DEMO DATA
             </span>
           )}
-          <span className="font-mono text-[11px] uppercase tracking-wider text-outline px-2 py-0.5 rounded bg-surface-container border border-outline-variant/40">
-            Pact #{pact?.id || pactId.replace(/^P-/, "")}
-          </span>
+          {numericPactId && (
+            <span className="font-mono text-[11px] uppercase tracking-wider text-outline px-2 py-0.5 rounded bg-surface-container border border-outline-variant/40">
+              Pact #{numericPactId}
+            </span>
+          )}
         </div>
       </div>
 
@@ -64,25 +71,27 @@ export default function PaymentObligationCard({ pact, pactId = "P-1024", isDemo 
             <div>
               <div className="text-[11px] font-mono uppercase text-outline">From Originator</div>
               <div className="font-semibold text-white flex items-center gap-1.5">
-                <span>{pact ? "Pact Creator" : "PaymentAgent-B"}</span>
+                <span>{pact ? "Pact Creator" : (isDemo ? "PaymentAgent-B" : "Originator")}</span>
                 <span className="text-xs font-mono text-outline-variant">
                   {pact ? "(On-Chain)" : "(AI Agent)"}
                 </span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-1.5 font-mono text-xs text-on-surface-variant bg-surface-high px-2 py-1 rounded">
-            <span>{shortenAddress(creatorAddr)}</span>
-            <button
-              onClick={handleCopyCreator}
-              className="text-outline hover:text-white transition-colors cursor-pointer"
-              title="Copy Creator Address"
-            >
-              <span className="material-symbols-outlined text-[13px]">
-                {copiedCreator ? "check" : "content_copy"}
-              </span>
-            </button>
-          </div>
+          {creatorAddr && (
+            <div className="flex items-center gap-1.5 font-mono text-xs text-on-surface-variant bg-surface-high px-2 py-1 rounded">
+              <span>{shortenAddress(creatorAddr)}</span>
+              <button
+                onClick={handleCopyCreator}
+                className="text-outline hover:text-white transition-colors cursor-pointer"
+                title="Copy Creator Address"
+              >
+                <span className="material-symbols-outlined text-[13px]">
+                  {copiedCreator ? "check" : "content_copy"}
+                </span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* AMOUNT & TOKEN */}
@@ -113,36 +122,24 @@ export default function PaymentObligationCard({ pact, pactId = "P-1024", isDemo 
           </div>
           <div className="flex items-center justify-between gap-2 bg-surface-high/80 px-2.5 py-1.5 rounded border border-outline-variant/40">
             <span className="font-mono text-xs text-white truncate font-medium">
-              {recipientAddr}
+              {recipientAddr || "Not specified"}
             </span>
-            <button
-              onClick={handleCopyRecipient}
-              className="text-outline hover:text-white transition-colors cursor-pointer shrink-0"
-              title="Copy Address"
-            >
-              <span className="material-symbols-outlined text-[15px]">
-                {copiedRecipient ? "check" : "content_copy"}
-              </span>
-            </button>
+            {recipientAddr && (
+              <button
+                onClick={handleCopyRecipient}
+                className="text-outline hover:text-white transition-colors cursor-pointer shrink-0"
+                title="Copy Address"
+              >
+                <span className="material-symbols-outlined text-[15px]">
+                  {copiedRecipient ? "check" : "content_copy"}
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
         {/* DEADLINE & CREATED TIMESTAMP */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-          {/* Deadline */}
-          <div className="p-3 rounded-lg bg-surface-container/60 border border-outline-variant/30 flex flex-col justify-between">
-            <span className="text-[11px] font-mono uppercase text-outline">Expiration Deadline</span>
-            <div className="mt-1">
-              <span className="font-mono text-xs sm:text-sm font-bold text-white block truncate" title={deadlineDisplay}>
-                {deadlineDisplay}
-              </span>
-              <div className="mt-1 flex items-center gap-1 font-mono text-[10px] text-tertiary">
-                <span className="material-symbols-outlined text-[13px]">alarm</span>
-                <span>{pact?.isExpired ? "Deadline Expired" : "Timelock Active"}</span>
-              </div>
-            </div>
-          </div>
-
           {/* Creation Timestamp */}
           <div className="p-3 rounded-lg bg-surface-container/60 border border-primary/30 flex flex-col justify-between relative overflow-hidden">
             <div className="pointer-events-none absolute -right-4 -bottom-4 w-14 h-14 bg-primary-container/20 rounded-full blur-xl"></div>
@@ -158,34 +155,69 @@ export default function PaymentObligationCard({ pact, pactId = "P-1024", isDemo 
               </div>
             </div>
           </div>
+
+          {/* Expiration Deadline */}
+          <div className="p-3 rounded-lg bg-surface-container/60 border border-outline-variant/30 flex flex-col justify-between">
+            <span className="text-[11px] font-mono uppercase text-outline">Expiration Deadline</span>
+            <div className="mt-1">
+              <span className="font-mono text-xs sm:text-sm font-bold text-white block truncate" title={deadlineDisplay}>
+                {deadlineDisplay}
+              </span>
+              <div className="mt-1 flex items-center gap-1 font-mono text-[10px] text-tertiary">
+                <span className="material-symbols-outlined text-[13px]">alarm</span>
+                <span>{pact?.isExpired ? "Deadline Expired" : "Timelock Active"}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Cryptographic Evidence Hash (if available) */}
-        {hasEvidence && (
-          <div className="p-3 rounded-lg bg-surface-container/60 border border-cyan/30 flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-mono uppercase text-cyan font-semibold flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">fingerprint</span>
-                Cryptographic Evidence Hash
-              </span>
-              <span className="text-[10px] font-mono text-cyan bg-cyan/10 px-1.5 py-0.5 rounded border border-cyan/20">
-                SUBMITTED
-              </span>
-            </div>
-            <div className="flex items-center justify-between gap-2 bg-surface-high/80 px-2.5 py-1.5 rounded border border-outline-variant/40">
-              <span className="font-mono text-xs text-white truncate">
-                {evidenceHash}
-              </span>
-              <button
-                onClick={handleCopyEvidence}
-                className="text-outline hover:text-white transition-colors cursor-pointer shrink-0"
-                title="Copy Evidence Hash"
-              >
-                <span className="material-symbols-outlined text-[15px]">
-                  {copiedEvidence ? "check" : "content_copy"}
+        {/* SUBMISSION TIMESTAMP & EVIDENCE (If available) */}
+        {(submittedAtDisplay || hasEvidence) && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {submittedAtDisplay && (
+              <div className="p-3 rounded-lg bg-surface-container/60 border border-cyan/30 flex flex-col justify-between">
+                <span className="text-[11px] font-mono uppercase text-cyan font-semibold flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px]">event_available</span>
+                  Submitted Timestamp
                 </span>
-              </button>
-            </div>
+                <div className="mt-1">
+                  <span className="font-mono text-xs font-bold text-cyan block truncate" title={submittedAtDisplay}>
+                    {submittedAtDisplay}
+                  </span>
+                  <div className="mt-1 text-[10px] font-mono text-outline">
+                    Evidence Delivered
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {hasEvidence && (
+              <div className={`p-3 rounded-lg bg-surface-container/60 border border-cyan/30 flex flex-col gap-1.5 ${!submittedAtDisplay ? "sm:col-span-2" : ""}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-mono uppercase text-cyan font-semibold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px]">fingerprint</span>
+                    Evidence Hash
+                  </span>
+                  <span className="text-[10px] font-mono text-cyan bg-cyan/10 px-1.5 py-0.5 rounded border border-cyan/20">
+                    RECORDED
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 bg-surface-high/80 px-2.5 py-1.5 rounded border border-outline-variant/40 mt-1">
+                  <span className="font-mono text-xs text-white truncate" title={evidenceHash}>
+                    {evidenceHash}
+                  </span>
+                  <button
+                    onClick={handleCopyEvidence}
+                    className="text-outline hover:text-white transition-colors cursor-pointer shrink-0"
+                    title="Copy Evidence Hash"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">
+                      {copiedEvidence ? "check" : "content_copy"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

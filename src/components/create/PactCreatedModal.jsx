@@ -3,7 +3,8 @@ import { Link } from "react-router-dom"
 export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
   if (!isOpen) return null
 
-  const pactId = pactDetails?.createdPactId ? `#P-${pactDetails.createdPactId}` : "#P-1025"
+  const numericId = pactDetails?.createdPactId ? String(pactDetails.createdPactId) : null
+  const pactDisplayId = numericId ? `#${numericId}` : "Confirmed"
   const txHash = pactDetails?.transactionHash || ""
   const explorerUrl = txHash ? `https://testnet.monadexplorer.com/tx/${txHash}` : "#"
 
@@ -40,7 +41,7 @@ export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
         <div className="rounded-xl bg-[#0D0E11] p-4 border border-white/10 flex flex-col gap-2.5 font-mono text-xs text-[#94A3B8] relative z-10">
           <div className="flex justify-between items-center">
             <span>Pact Identifier:</span>
-            <span className="text-[#D2BBFF] font-semibold">{pactId}</span>
+            <span className="text-[#D2BBFF] font-semibold">{pactDisplayId}</span>
           </div>
           <div className="flex justify-between items-center">
             <span>Disbursement Amount:</span>
@@ -77,13 +78,24 @@ export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center gap-3 pt-2 relative z-10">
-          <Link
-            to={`/agreement/${pactDetails.createdPactId || 'P-1024'}`}
-            className="w-full sm:w-auto flex-1 py-2.5 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-sans text-xs sm:text-sm font-semibold text-center shadow-[0_0_20px_rgba(124,58,237,0.4)] transition-all flex items-center justify-center gap-1.5"
-          >
-            <span>Inspect Pact {pactId}</span>
-            <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-          </Link>
+          {numericId ? (
+            <Link
+              to={`/agreement/${numericId}`}
+              state={{ transactionHash: txHash }}
+              className="w-full sm:w-auto flex-1 py-2.5 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-sans text-xs sm:text-sm font-semibold text-center shadow-[0_0_20px_rgba(124,58,237,0.4)] transition-all flex items-center justify-center gap-1.5"
+            >
+              <span>Inspect Pact #{numericId}</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </Link>
+          ) : (
+            <Link
+              to="/dashboard"
+              className="w-full sm:w-auto flex-1 py-2.5 px-4 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-sans text-xs sm:text-sm font-semibold text-center shadow-[0_0_20px_rgba(124,58,237,0.4)] transition-all flex items-center justify-center gap-1.5"
+            >
+              <span>View in Dashboard</span>
+              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </Link>
+          )}
           <Link
             to="/dashboard"
             className="w-full sm:w-auto py-2.5 px-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white font-sans text-xs sm:text-sm font-medium text-center transition-colors"

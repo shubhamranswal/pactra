@@ -1,13 +1,13 @@
 import { shortenAddress } from "../../utils/address"
 
-export default function DynamicOutcomeCard({ mode, invariants, pact }) {
+export default function DynamicOutcomeCard({ mode, invariants, pact, isDemo = false }) {
   const isVerifying = mode === "verifying"
   const isPassed = mode === "passed"
   const isExpired = mode === "expired" || !invariants.deadline
 
-  const amountText = pact ? `${pact.amountFormatted} MON` : "5 MON"
-  const recipientAddr = pact ? shortenAddress(pact.recipient) : "0x7099...79C8"
-  const creatorAddr = pact ? shortenAddress(pact.creator) : "0x8192...c09f"
+  const amountText = pact ? `${pact.amountFormatted} MON` : (isDemo ? "5 MON" : "—")
+  const recipientAddr = pact?.recipient ? shortenAddress(pact.recipient) : (isDemo ? "0x7099...79C8" : "Designated Recipient")
+  const creatorAddr = pact?.creator ? shortenAddress(pact.creator) : (isDemo ? "0x8192...c09f" : "Originator")
 
   let failReasonBadge = "Recipient mismatch"
   let failExplanationText =
@@ -118,7 +118,7 @@ export default function DynamicOutcomeCard({ mode, invariants, pact }) {
             <div className="flex items-center justify-between pt-2 border-t border-outline-variant/30 text-xs">
               <span className="text-outline">Recipient:</span>
               <span className="font-mono text-white text-right truncate">
-                {pact ? pact.recipient : "0x7099...79C8"}
+                {pact ? pact.recipient : (isDemo ? "0x7099...79C8" : "—")}
               </span>
             </div>
           </div>

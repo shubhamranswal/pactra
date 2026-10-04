@@ -61,9 +61,9 @@ export function usePact(pactId) {
     isInvalidId = true
   } else {
     const rawString = pactId.toString().trim()
-    const stripped = rawString.replace(/^P-/, "").trim()
-    if (/^\d+$/.test(stripped)) {
-      const parsedBigInt = BigInt(stripped)
+    // Strict numeric ID validation: positive integers only
+    if (/^\d+$/.test(rawString)) {
+      const parsedBigInt = BigInt(rawString)
       if (parsedBigInt > 0n) {
         cleanId = parsedBigInt
       } else {
@@ -91,10 +91,15 @@ export function usePact(pactId) {
     },
   })
 
-  // Detect not-found versus other RPC errors
-  const errString = (error?.message || error?.shortMessage || "") + (error?.details || "")
+  // Detect not-found (PactDoesNotExist) versus other RPC connection errors
+  const errString = `${error?.name || ""} ${error?.shortMessage || ""} ${error?.message || ""} ${error?.details || ""} ${error?.data?.errorName || ""}`
   const isNotFound = Boolean(
-    isError && (errString.includes("PactDoesNotExist") || errString.includes("reverted with"))
+    isError && (
+      errString.includes("PactDoesNotExist") ||
+      error?.data?.errorName === "PactDoesNotExist" ||
+      errString.includes("reverted") ||
+      errString.includes("revert")
+    )
   )
   const isRpcError = Boolean(isError && !isNotFound)
 
@@ -117,31 +122,61 @@ export function usePact(pactId) {
       rawPact.evidenceHash.length > 2
     )
 
+    const submittedAtNumber = Number(rawPact.submittedAt)
+    const hasSubmitted = submittedAtNumber > 0
+
     pact = {
       id: rawPact.id.toString(),
-      displayId: `P-${rawPact.id.toString()}`,
+      displayId: `#${rawPact.id.toString()}`,
       creator: rawPact.creator,
       recipient: rawPact.recipient,
       amount: rawPact.amount,
       amountFormatted: formatEther(rawPact.amount),
       createdAt: Number(rawPact.createdAt),
       deadline: Number(rawPact.deadline),
-      submittedAt: Number(rawPact.submittedAt),
+      submittedAt: submittedAtNumber,
+      hasSubmitted,
       status: statusCode,
       statusInfo,
       statusLabel: statusInfo.label,
       evidenceHash: rawPact.evidenceHash,
       hasEvidence,
-      createdAtFormatted: rawPact.createdAt
-        ? new Date(Number(rawPact.createdAt) * 1000).toUTCString()
+      createdAtFormatted: rawPact.createdAt && Number(rawPact.createdAt) > 0
+        ? new Date(Number(rawPact.createdAt) * 1000).toLocaleString("en-US", {
+            timeZone: "UTC",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZoneName: "short",
+          })
         : "N/A",
-      deadlineFormatted: rawPact.deadline
-        ? new Date(Number(rawPact.deadline) * 1000).toUTCString()
+      deadlineFormatted: rawPact.deadline && Number(rawPact.deadline) > 0
+        ? new Date(Number(rawPact.deadline) * 1000).toLocaleString("en-US", {
+            timeZone: "UTC",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZoneName: "short",
+          })
         : "N/A",
-      submittedAtFormatted:
-        rawPact.submittedAt && Number(rawPact.submittedAt) > 0
-          ? new Date(Number(rawPact.submittedAt) * 1000).toUTCString()
-          : "Pending submission",
+      submittedAtFormatted: hasSubmitted
+        ? new Date(submittedAtNumber * 1000).toLocaleString("en-US", {
+            timeZone: "UTC",
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+            timeZoneName: "short",
+          })
+        : null,
       isExpired: rawPact.deadline && nowSeconds > 0 ? nowSeconds > Number(rawPact.deadline) : rawPact.status === 3,
       contractAddress: PACT_ESCROW_ADDRESS,
     }

@@ -127,10 +127,10 @@ export default function ExecutionPipeline() {
           </h2>
         </div>
         <Link
-          to="/agreement/P-1024"
+          to="/agreement/1"
           className="flex items-center gap-1 font-mono text-xs text-[#38BDF8] hover:underline"
         >
-          <span>Inspect Active Flow #P-1024</span>
+          <span>Inspect Active Flow #1</span>
           <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
         </Link>
       </div>
@@ -141,7 +141,7 @@ export default function ExecutionPipeline() {
           <div key={idx} className="w-full flex flex-col items-center">
             {/* Step Card */}
             <Link
-              to="/agreement/P-1024"
+              to="/agreement/1"
               className={`w-full p-4 rounded-xl backdrop-blur-xl bg-[#0B0C10]/85 border border-white/10 shadow-md flex items-center justify-between group hover:border-[#7C3AED]/40 hover:bg-[#14151A]/90 transition-all cursor-pointer relative overflow-hidden`}
             >
               {step.highlightBar && (

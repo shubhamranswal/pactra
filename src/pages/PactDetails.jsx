@@ -16,7 +16,6 @@ import { shortenAddress } from "../utils/address"
 export default function PactDetails() {
   const { id } = useParams()
   const location = useLocation()
-  const passedTxHash = location.state?.transactionHash || null
 
   const [forceDemoMode, setForceDemoMode] = useState(false)
   const [simulatedMode, setSimulatedMode] = useState(null)
@@ -33,9 +32,32 @@ export default function PactDetails() {
     refetch,
   } = usePact(id)
 
+  // Derive transaction hash from navigation state or session storage cache
+  const navTxHash = location.state?.transactionHash || null
+  const transactionHash = useMemo(() => {
+    if (navTxHash) {
+      if (id) {
+        try {
+          sessionStorage.setItem(`pact_tx_${id}`, navTxHash)
+        } catch {
+          // ignore storage errors
+        }
+      }
+      return navTxHash
+    }
+    if (id) {
+      try {
+        return sessionStorage.getItem(`pact_tx_${id}`) || null
+      } catch {
+        return null
+      }
+    }
+    return null
+  }, [navTxHash, id])
+
   const isDemo = forceDemoMode || (!pact && !isLoading && (isNotFound || isInvalidId || isRpcError))
 
-  // Derive mode from pact if not overridden by simulation
+  // Derive mode directly from real contract status
   const derivedMode = pact
     ? (pact.status === 2 ? "passed" : pact.status === 3 ? "expired" : "verifying")
     : "verifying"
@@ -43,45 +65,68 @@ export default function PactDetails() {
   const mode = simulatedMode ?? derivedMode
 
   const defaultInvariants = useMemo(() => {
-    if (mode === "passed") {
-      return {
-        sender: true,
-        recipient: true,
-        token: true,
-        amount: true,
-        tx: true,
-        deadline: true,
+    if (simulatedMode) {
+      if (simulatedMode === "passed") {
+        return {
+          sender: true,
+          recipient: true,
+          token: true,
+          amount: true,
+          tx: true,
+          deadline: true,
+        }
       }
-    }
-    if (mode === "expired") {
+      if (simulatedMode === "expired") {
+        return {
+          sender: true,
+          recipient: true,
+          token: true,
+          amount: true,
+          tx: false,
+          deadline: false,
+        }
+      }
+      if (simulatedMode === "mismatch") {
+        return {
+          sender: true,
+          recipient: false,
+          token: true,
+          amount: true,
+          tx: true,
+          deadline: true,
+        }
+      }
       return {
         sender: true,
         recipient: true,
         token: true,
         amount: true,
         tx: false,
-        deadline: false,
-      }
-    }
-    if (mode === "mismatch") {
-      return {
-        sender: true,
-        recipient: false,
-        token: true,
-        amount: true,
-        tx: true,
         deadline: true,
       }
     }
+
+    // Default: Truthful on-chain invariant state
+    if (pact) {
+      return {
+        sender: true,
+        recipient: true,
+        token: true,
+        amount: true,
+        tx: Boolean(pact.hasEvidence),
+        deadline: !pact.isExpired,
+      }
+    }
+
     return {
       sender: true,
       recipient: true,
       token: true,
       amount: true,
-      tx: Boolean(pact?.hasEvidence),
-      deadline: pact ? !pact.isExpired : true,
+      tx: false,
+      deadline: true,
     }
-  }, [mode, pact])
+  }, [simulatedMode, pact])
 
   const invariants = customInvariants ?? defaultInvariants
 
@@ -263,7 +308,7 @@ export default function PactDetails() {
             {/* Header Section */}
             <PactHeader
               pact={pact}
-              pactId={pact?.displayId || id || "P-1024"}
+              pactId={pact?.id || cleanId || id}
               mode={mode}
               isDemo={isDemo}
             />
@@ -285,12 +330,12 @@ export default function PactDetails() {
               <div className="lg:col-span-5 flex flex-col gap-6">
                 <PaymentObligationCard
                   pact={pact}
-                  pactId={pact?.displayId || id || "P-1024"}
+                  pactId={pact?.id || cleanId || id}
                   isDemo={isDemo}
                 />
                 <BlockchainTxCard
                   pact={pact}
-                  transactionHash={passedTxHash}
+                  transactionHash={transactionHash}
                   isDemo={isDemo}
                 />
               </div>
