@@ -7,7 +7,6 @@ pragma solidity ^0.8.24;
  */
 contract PactEscrow {
     enum PactStatus {
-        Created,
         Funded,
         Submitted,
         Settled,
@@ -21,9 +20,14 @@ contract PactEscrow {
         uint256 amount;
         uint256 createdAt;
         uint256 deadline;
+        uint256 submittedAt;
         PactStatus status;
         bytes32 evidenceHash;
     }
+
+    // Constants
+    uint256 public constant REVIEW_PERIOD = 3 days;
+    uint256 public constant MAX_DURATION = 365 days;
 
     // Custom Errors
     error ZeroEscrowAmount();
@@ -40,6 +44,7 @@ contract PactEscrow {
     error EvidenceNotSubmitted();
     error PactAlreadySettled();
     error PactAlreadyRefunded();
+    error ReviewPeriodActive();
     error TransferFailed();
     error ReentrancyGuardReentrant();
 
@@ -78,7 +83,7 @@ contract PactEscrow {
         if (msg.value == 0) revert ZeroEscrowAmount();
         if (recipient == address(0)) revert InvalidRecipient();
         if (recipient == msg.sender) revert SelfRecipientNotAllowed();
-        if (deadline <= block.timestamp) revert InvalidDeadline();
+        if (deadline <= block.timestamp || deadline > block.timestamp + MAX_DURATION) revert InvalidDeadline();
 
         _pactIdCounter++;
         uint256 pactId = _pactIdCounter;
@@ -90,6 +95,7 @@ contract PactEscrow {
             amount: msg.value,
             createdAt: block.timestamp,
             deadline: deadline,
+            submittedAt: 0,
             status: PactStatus.Funded,
             evidenceHash: bytes32(0)
         });
@@ -115,6 +121,7 @@ contract PactEscrow {
         if (block.timestamp > pact.deadline) revert DeadlinePassed();
 
         pact.evidenceHash = evidenceHash;
+        pact.submittedAt = block.timestamp;
         pact.status = PactStatus.Submitted;
 
         emit EvidenceSubmitted(pactId, msg.sender, evidenceHash);
@@ -150,7 +157,36 @@ contract PactEscrow {
     }
 
     /**
-     * @notice Refunds escrow funds to the creator if the deadline has passed without settlement.
+     * @notice Allows the recipient to claim escrow funds after the review period has elapsed without creator settlement.
+     * @param pactId ID of the pact to claim.
+     */
+    function claimAfterReview(uint256 pactId) external nonReentrant {
+        if (pactId == 0 || pactId > _pactIdCounter) revert PactDoesNotExist();
+
+        Pact storage pact = _pacts[pactId];
+
+        if (msg.sender != pact.recipient) revert UnauthorizedRecipient();
+        if (pact.status != PactStatus.Submitted) {
+            if (pact.status == PactStatus.Settled) revert PactAlreadySettled();
+            if (pact.status == PactStatus.Refunded) revert PactAlreadyRefunded();
+            revert InvalidPactState();
+        }
+        if (block.timestamp < pact.submittedAt + REVIEW_PERIOD) revert ReviewPeriodActive();
+
+        uint256 amount = pact.amount;
+        address recipient = pact.recipient;
+
+        // Checks-Effects-Interactions
+        pact.status = PactStatus.Settled;
+
+        emit PactSettled(pactId, recipient, amount);
+
+        (bool success,) = recipient.call{value: amount}("");
+        if (!success) revert TransferFailed();
+    }
+
+    /**
+     * @notice Refunds escrow funds to the creator if the deadline has passed without evidence submission.
      * @param pactId ID of the pact to refund.
      */
     function refundPact(uint256 pactId) external nonReentrant {
@@ -161,7 +197,7 @@ contract PactEscrow {
         if (block.timestamp <= pact.deadline) revert DeadlineNotPassed();
         if (pact.status == PactStatus.Settled) revert PactAlreadySettled();
         if (pact.status == PactStatus.Refunded) revert PactAlreadyRefunded();
-        if (pact.status != PactStatus.Funded && pact.status != PactStatus.Submitted) revert InvalidPactState();
+        if (pact.status != PactStatus.Funded) revert InvalidPactState();
 
         uint256 amount = pact.amount;
         address creator = pact.creator;
