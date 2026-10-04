@@ -1,7 +1,10 @@
-﻿export default function InvariantsChecklist({
+import { shortenAddress } from "../../utils/address"
+
+export default function InvariantsChecklist({
   invariants,
   mode,
   onToggleInvariant,
+  pact,
 }) {
   const invKeys = ["sender", "recipient", "token", "amount", "tx", "deadline"]
   const passedCount = invKeys.filter((k) => invariants[k]).length
@@ -10,20 +13,20 @@
     if (mode === "verifying") {
       return (
         <span className="ml-2 px-2 py-0.5 rounded-full bg-primary/20 border border-primary/40 text-primary font-mono text-[11px] font-semibold">
-          6 of 6 checking
+          {passedCount} of 6 evaluated
         </span>
       )
     }
     if (passedCount === 6) {
       return (
         <span className="ml-2 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-mono text-[11px] font-semibold">
-          6 of 6 passed
+          6 of 6 satisfied
         </span>
       )
     }
     return (
       <span className="ml-2 px-2 py-0.5 rounded-full bg-danger/20 border border-danger/40 text-danger font-mono text-[11px] font-semibold">
-        {passedCount} of 6 passed
+        {passedCount} of 6 satisfied
       </span>
     )
   }
@@ -32,55 +35,55 @@
     {
       key: "sender",
       num: "1. Sender",
-      title: "Originator Sig",
-      sub: "0x4a9...e21",
-      passText: "✓ SIG VALIDATED",
+      title: "Originator Auth",
+      sub: pact ? shortenAddress(pact.creator) : "0x4a9...e21",
+      passText: "✓ AUTH VALIDATED",
       failText: "✕ FAILED CHECK",
     },
     {
       key: "recipient",
       num: "2. Recipient",
-      title: "Match Target",
-      sub: "0x71C...92",
-      passText: "✓ RESOLVED MATCH",
+      title: "Target Recipient",
+      sub: pact ? shortenAddress(pact.recipient) : "0x709...79C8",
+      passText: "✓ RECIPIENT MATCH",
       failText: "✕ RECIPIENT MISMATCH",
     },
     {
       key: "token",
       num: "3. Token",
-      title: "Asset Pair",
-      sub: "MON (Native)",
-      passText: "✓ WHITELISTED",
+      title: "Native Escrow",
+      sub: "MON (Native Escrow)",
+      passText: "✓ NATIVE MON LOCK",
       failText: "✕ FAILED CHECK",
     },
     {
       key: "amount",
       num: "4. Amount",
-      title: "Value Exact",
-      sub: "5.0000 MON",
+      title: "Deposit Exact",
+      sub: pact ? `${pact.amountFormatted} MON` : "5.0000 MON",
       passText: "✓ EXACT MATCH",
       failText: "✕ FAILED CHECK",
     },
     {
       key: "tx",
-      num: "5. Tx Inclusion",
-      title: "Receipt State",
-      sub: "0x82af...91bd",
-      passText: "✓ RECEIPT VERIFIED",
-      failText: "✕ FAILED CHECK",
+      num: "5. Evidence Proof",
+      title: "Cryptographic Proof",
+      sub: pact?.hasEvidence ? "Evidence Hash On-Chain" : (pact ? "Pending Evidence" : "zkProof / Hash Recorded"),
+      passText: pact?.hasEvidence ? "✓ EVIDENCE VERIFIED" : "✓ PREDICATE VALID",
+      failText: "✕ EVIDENCE MISSING",
     },
     {
       key: "deadline",
       num: "6. Deadline",
       title: "Timelock Window",
-      sub: "< 18:00 UTC",
-      passText: "✓ IN TIMELOCK",
+      sub: pact ? (pact.isExpired ? "Expired" : "Active Timelock") : "< 18:00 UTC",
+      passText: "✓ WITHIN TIMELOCK",
       failText: "✕ TIMELOCK EXPIRED",
     },
   ]
 
   return (
-    <div className="rounded-xl bg-surface-low border border-outline-variant/50 p-5 shadow-lg flex flex-col gap-4">
+    <div className="rounded-xl bg-surface-low border border-outline-variant/50 p-5 shadow-lg flex flex-col gap-4 text-left">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-outline-variant/30 pb-3">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-[20px]">fact_check</span>
@@ -88,7 +91,7 @@
           {getStatusBadge()}
         </div>
         <span className="font-mono text-[11px] text-outline">
-          Click invariant card to toggle simulated condition
+          Interactive simulation toggles
         </span>
       </div>
 
@@ -111,19 +114,23 @@
                   {item.num}
                 </span>
                 <span
-                  className={`material-symbols-outlined text-[17px] ${
-                    isOk ? "text-success" : "text-danger"
+                  className={`w-2 h-2 rounded-full ${
+                    isOk ? "bg-success shadow-[0_0_6px_#10b981]" : "bg-danger shadow-[0_0_6px_#ef4444]"
                   }`}
-                >
-                  {isOk ? "check_circle" : "cancel"}
-                </span>
+                ></span>
               </div>
+
               <div>
-                <div className="font-mono text-xs font-semibold text-white">{item.title}</div>
-                <div className="font-mono text-[10px] text-outline truncate">{item.sub}</div>
+                <div className="font-sans text-xs font-semibold text-white">
+                  {item.title}
+                </div>
+                <div className="font-mono text-[11px] text-on-surface-variant truncate">
+                  {item.sub}
+                </div>
               </div>
+
               <div
-                className={`font-mono text-[9px] tracking-wide font-semibold ${
+                className={`font-mono text-[10px] font-semibold tracking-wider pt-1 border-t border-outline-variant/30 ${
                   isOk ? "text-success" : "text-danger"
                 }`}
               >

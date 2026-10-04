@@ -9,18 +9,13 @@ export default function QuickPactModal({ isOpen, onClose }) {
   const [sla, setSla] = useState("< 800 ms")
   const [epochs, setEpochs] = useState("1084")
   const [schema, setSchema] = useState("ZK-SNARK Invariant Proof (Fast Finality)")
-  const [submitted, setSubmitted] = useState(false)
 
   if (!isOpen) return null
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    setSubmitted(true)
-    setTimeout(() => {
-      setSubmitted(false)
-      onClose()
-      navigate("/create-agreement")
-    }, 1200)
+    onClose()
+    navigate("/create-agreement")
   }
 
   return (
@@ -50,20 +45,7 @@ export default function QuickPactModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {submitted ? (
-          <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
-            <div className="w-14 h-14 rounded-full bg-[#10B981]/20 border border-[#10B981]/40 flex items-center justify-center text-[#10B981] animate-pulse">
-              <span className="material-symbols-outlined text-[32px]">check</span>
-            </div>
-            <h4 className="font-display text-xl font-bold text-white">
-              Autonomous Pact Initiated
-            </h4>
-            <p className="font-mono text-xs text-[#38BDF8] max-w-sm">
-              Escrow vault compiled. Redirecting to Agreement Creation Studio...
-            </p>
-          </div>
-        ) : (
-          <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
+        <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block font-mono text-[11px] text-[#94A3B8] uppercase tracking-wider mb-1.5">
@@ -166,7 +148,6 @@ export default function QuickPactModal({ isOpen, onClose }) {
               </button>
             </div>
           </form>
-        )}
       </div>
     </div>
   )

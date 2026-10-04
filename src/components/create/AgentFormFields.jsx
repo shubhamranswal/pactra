@@ -85,7 +85,7 @@ export default function AgentFormFields({
           <div className="flex items-center gap-1 pr-1">
             <button
               type="button"
-              onClick={() => setRecipientAddress("0x71C5A82d54B98819446D61BcA49A92")}
+              onClick={() => setRecipientAddress("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")}
               className="px-2 py-1 rounded text-[#38BDF8] hover:bg-white/5 font-mono text-[10px] transition-colors"
             >
               Paste Sample

@@ -12,12 +12,12 @@ import { useCreatePact } from "../hooks/useCreatePact"
 import { isPactEscrowConfigured } from "../config/contracts"
 
 const DEFAULT_INVARIANTS = [
-  { id: 1, label: "Sender Auth", satisfied: true, removable: false },
-  { id: 2, label: "Recipient Address", satisfied: true, removable: false },
-  { id: 3, label: "Token Whitelist", satisfied: true, removable: false },
-  { id: 4, label: "Exact Amount", satisfied: true, removable: false },
-  { id: 5, label: "Deadline Window", satisfied: true, removable: false },
-  { id: 6, label: "TX Success / Merkle Root", satisfied: true, removable: false },
+  { id: 1, label: "Sender Authentication", satisfied: true, removable: false },
+  { id: 2, label: "Recipient Address Validation", satisfied: true, removable: false },
+  { id: 3, label: "Native MON Escrow Deposit", satisfied: true, removable: false },
+  { id: 4, label: "Exact Escrow Amount Lock", satisfied: true, removable: false },
+  { id: 5, label: "Timelock Deadline Window", satisfied: true, removable: false },
+  { id: 6, label: "Cryptographic Evidence Hash", satisfied: true, removable: false },
 ]
 
 function getTimeoutDurationInSeconds(timeoutStr) {
@@ -38,38 +38,14 @@ function getTimeoutDurationInSeconds(timeoutStr) {
   return 86400
 }
 
-function formatErrorMessage(err) {
-  if (!err) return null
-  const msg = typeof err === "string" ? err : err.message || ""
-  if (msg.includes("User rejected") || msg.includes("user rejected") || msg.includes("User denied")) {
-    return "Transaction request rejected in wallet."
-  }
-  if (msg.includes("insufficient funds") || msg.includes("exceeds the balance")) {
-    return "Insufficient MON balance in your wallet for escrow amount + gas fee."
-  }
-  if (msg.includes("InvalidRecipient") || msg.includes("recipient")) {
-    return "Invalid recipient address or self-recipient not allowed."
-  }
-  if (msg.includes("InvalidDeadline") || msg.includes("deadline")) {
-    return "Invalid deadline timestamp provided."
-  }
-  if (msg.includes("ZeroEscrowAmount")) {
-    return "Escrow amount must be greater than zero."
-  }
-  if (msg.includes("configured")) {
-    return "PactEscrow contract address is missing in VITE_PACT_ESCROW_ADDRESS environment variable."
-  }
-  return msg.split("\n")[0].substring(0, 160)
-}
-
 export default function CreateAgreement() {
   const [selectedArchitecture, setSelectedArchitecture] = useState("MON")
   const [providerAgent, setProviderAgent] = useState("PaymentAgent-B")
-  const [recipientAddress, setRecipientAddress] = useState("0x71C5A82d54B98819446D61BcA49A92")
+  const [recipientAddress, setRecipientAddress] = useState("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
   const [token, setToken] = useState("MON")
-  const [amount, setAmount] = useState("500.00")
+  const [amount, setAmount] = useState("0.1")
   const [timeout, setTimeoutHours] = useState("24 Hours")
-  const [collateral, setCollateral] = useState("100 USDC")
+  const [collateral, setCollateral] = useState("Native Escrow Vault")
   const [invariants, setInvariants] = useState(DEFAULT_INVARIANTS)
   const [validationError, setValidationError] = useState("")
   const [modalDismissed, setModalDismissed] = useState(false)
@@ -84,14 +60,15 @@ export default function CreateAgreement() {
     isConfirming,
     isSuccess,
     error: contractError,
+    errorMessage: contractErrorMessage,
     reset,
   } = useCreatePact()
 
   const isSuccessModalOpen = isSuccess && !modalDismissed
 
-  const handleSelectArchitecture = (archId, defaultToken) => {
+  const handleSelectArchitecture = (archId) => {
     setSelectedArchitecture(archId)
-    setToken(defaultToken)
+    setToken("MON")
   }
 
   const handleToggleInvariant = (id) => {
@@ -116,54 +93,85 @@ export default function CreateAgreement() {
     setModalDismissed(false)
     reset()
 
-    if (!isPactEscrowConfigured) {
-      setValidationError("PactEscrow contract address is missing in VITE_PACT_ESCROW_ADDRESS.")
-      return
-    }
-
+    // 1. Verify wallet connected
     if (!isConnected || !address) {
       setValidationError("Please connect your wallet first.")
       return
     }
 
+    // 2. Verify correct network
     if (!isCorrectNetwork) {
-      setValidationError("Please switch your wallet to Monad Testnet.")
+      setValidationError("Please switch your wallet to Monad Testnet (Chain ID 10143).")
       return
     }
 
-    if (!isAddress(recipientAddress, { strict: false })) {
-      setValidationError("Please enter a valid recipient EVM address.")
+    // Contract address verification
+    if (!isPactEscrowConfigured) {
+      setValidationError("PactEscrow contract is not configured. Please check VITE_PACT_ESCROW_ADDRESS.")
       return
     }
 
-    if (recipientAddress.toLowerCase() === address.toLowerCase()) {
+    // 3. Validate recipient address
+    const cleanRecipient = recipientAddress.trim()
+    if (!cleanRecipient) {
+      setValidationError("Please enter a recipient EVM address.")
+      return
+    }
+
+    if (!isAddress(cleanRecipient, { strict: false })) {
+      setValidationError("Please enter a valid 42-character recipient EVM address (e.g. 0x...).")
+      return
+    }
+
+    if (cleanRecipient.toLowerCase() === address.toLowerCase()) {
       setValidationError("Recipient cannot be your own connected wallet address.")
       return
     }
 
-    const numAmount = parseFloat(amount)
-    if (isNaN(numAmount) || numAmount <= 0) {
-      setValidationError("Escrow amount must be greater than 0.")
+    // 4. Validate amount
+    const cleanAmount = amount.toString().trim()
+    const numAmount = parseFloat(cleanAmount)
+    if (!cleanAmount || isNaN(numAmount) || numAmount <= 0) {
+      setValidationError("Escrow deposit amount must be greater than 0.")
       return
     }
 
+    // 5. Convert amount correctly to wei
+    let valueWei
+    try {
+      valueWei = parseEther(cleanAmount)
+      if (valueWei <= 0n) {
+        setValidationError("Escrow amount in wei must be greater than zero.")
+        return
+      }
+    } catch {
+      setValidationError("Invalid numeric amount format for escrow.")
+      return
+    }
+
+    // 6. Calculate & validate deadline
     const durationSeconds = getTimeoutDurationInSeconds(timeout)
+    if (durationSeconds <= 0 || durationSeconds > 365 * 86400) {
+      setValidationError("Deadline must be between 1 minute and 365 days.")
+      return
+    }
     const currentTimestampSeconds = Math.floor(Date.now() / 1000)
     const deadlineSeconds = currentTimestampSeconds + durationSeconds
 
+    // 7. Call createPact & 8. Pass escrow value
     try {
-      const valueWei = parseEther(amount.toString())
       await createPact({
-        recipient: recipientAddress,
+        recipient: cleanRecipient,
         deadlineSeconds,
         valueWei,
       })
     } catch (err) {
-      console.error("Contract call failed:", err)
+      // Errors are surfaced through contractErrorMessage and displayError
+      console.error("Initiate pact execution error:", err)
     }
   }
 
-  const displayError = validationError || formatErrorMessage(contractError)
+  const displayError = validationError || contractErrorMessage || (contractError?.message ? contractError.message.split("\n")[0] : "")
 
   return (
     <MainLayout>
@@ -221,10 +229,10 @@ export default function CreateAgreement() {
                 </div>
                 <div className="flex flex-col">
                   <span className="font-sans text-xs sm:text-sm text-white font-medium">
-                    Consensus Pre-flight Complete
+                    Contract Pre-flight Ready
                   </span>
                   <span className="font-mono text-[11px] text-[#64748B]">
-                    Zero slippage risk • Parallel execution thread allocated
+                    Monad Testnet • Native MON Escrow • 3-day review period
                   </span>
                 </div>
               </div>

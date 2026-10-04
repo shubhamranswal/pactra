@@ -1,10 +1,10 @@
-﻿export default function LifecycleTimeline({ mode }) {
+export default function LifecycleTimeline({ mode, pact }) {
   const isVerifying = mode === "verifying"
   const isPassed = mode === "passed"
   const isFailed = mode === "mismatch" || mode === "expired"
 
   return (
-    <div className="rounded-xl bg-surface-low/90 border border-outline-variant/40 p-5 shadow-lg relative overflow-hidden">
+    <div className="rounded-xl bg-surface-low/90 border border-outline-variant/40 p-5 shadow-lg relative overflow-hidden text-left">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-[18px]">account_tree</span>
@@ -16,21 +16,29 @@
         {isVerifying && (
           <div className="text-xs font-mono text-tertiary flex items-center gap-1">
             <span className="material-symbols-outlined text-[14px] animate-spin text-tertiary">sync</span>
-            <span>Checking Monad BFT receipts against predicate invariants</span>
+            <span>
+              {pact?.status === 1
+                ? "Evidence submitted on-chain. 3-day review period active."
+                : (pact ? "Pact funded on Monad. Awaiting counterparty evidence." : "Checking Monad BFT receipts against predicate invariants")}
+            </span>
           </div>
         )}
 
         {isPassed && (
           <div className="text-xs font-mono text-success flex items-center gap-1">
             <span className="material-symbols-outlined text-[14px] text-success">verified</span>
-            <span className="font-semibold">All 6 invariants verified. Autonomous settlement finalized!</span>
+            <span className="font-semibold">
+              {pact ? "Pact settled on-chain. Escrow disbursement finalized!" : "All invariants verified. Autonomous settlement finalized!"}
+            </span>
           </div>
         )}
 
         {isFailed && (
           <div className="text-xs font-mono text-danger flex items-center gap-1">
             <span className="material-symbols-outlined text-[14px] text-danger">warning</span>
-            <span className="font-semibold">Invariant check failed. Escrow safely refunded to originator.</span>
+            <span className="font-semibold">
+              {pact ? "Pact deadline elapsed. Escrow refunded to creator." : "Invariant check failed. Escrow safely refunded to originator."}
+            </span>
           </div>
         )}
       </div>

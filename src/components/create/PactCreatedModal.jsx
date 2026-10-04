@@ -72,7 +72,7 @@ export default function PactCreatedModal({ isOpen, onClose, pactDetails }) {
 
         {/* Notice text */}
         <p className="font-sans text-xs text-[#94A3B8] leading-relaxed relative z-10">
-          On-chain escrow pact has been confirmed on Monad Testnet. Native MON collateral is safely held in the contract.
+          On-chain escrow pact has been confirmed on Monad Testnet. Native MON escrow deposit is securely locked in the PactEscrow contract.
         </p>
 
         {/* Action Buttons */}

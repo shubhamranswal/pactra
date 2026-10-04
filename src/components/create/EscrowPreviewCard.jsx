@@ -80,20 +80,20 @@ export default function EscrowPreviewCard({
         </div>
       </div>
 
-      {/* Collateral Escrow Tile */}
+      {/* Escrow Lock Term Tile */}
       <div className="bg-[#0D0E11]/90 border border-white/10 rounded-xl p-4 flex flex-col gap-1.5 relative z-10">
         <div className="flex justify-between items-center text-xs">
           <span className="font-mono uppercase tracking-wider text-[#64748B]">
-            Collateral Guarantee
+            Escrow Timelock Vault
           </span>
           <span className="font-mono text-[10px] text-[#10B981] bg-[#10B981]/10 px-1.5 py-0.2 rounded border border-[#10B981]/20">
-            BONDED
+            ON-CHAIN
           </span>
         </div>
         <div className="flex items-baseline justify-between mt-1">
           <div className="flex items-baseline gap-1.5">
             <span className="font-display text-xl font-bold text-white">
-              {collateral || "100 USDC"}
+              {token === "MON" ? `${numAmount} MON Vault` : collateral}
             </span>
           </div>
           <span className="font-mono text-[11px] text-[#64748B]">
@@ -101,7 +101,7 @@ export default function EscrowPreviewCard({
           </span>
         </div>
         <div className="flex items-center justify-between pt-1.5 font-mono text-[11px] text-[#64748B] border-t border-white/5">
-          <span>Auto-revert on failure</span>
+          <span>Auto-refund if expired</span>
           <span className="text-[#38BDF8] font-medium">100% Non-Custodial</span>
         </div>
       </div>
@@ -129,8 +129,8 @@ export default function EscrowPreviewCard({
           <span className="text-white">Sub-second (~400ms)</span>
         </div>
         <div className="flex justify-between">
-          <span>Consensus Pre-flight</span>
-          <span className="text-[#10B981]">100% Validated</span>
+          <span>Escrow State</span>
+          <span className="text-[#10B981]">Funded on Creation</span>
         </div>
       </div>
 

@@ -1,30 +1,61 @@
-﻿import { useState } from "react"
+import { useState } from "react"
+import { shortenAddress } from "../../utils/address"
 
-export default function PaymentObligationCard({ pactId = "P-1024" }) {
-  const [copied, setCopied] = useState(false)
-  const recipientAddr = "0x71C5A82d54B98819446D61BcA49A92"
+export default function PaymentObligationCard({ pact, pactId = "P-1024", isDemo = false }) {
+  const [copiedRecipient, setCopiedRecipient] = useState(false)
+  const [copiedCreator, setCopiedCreator] = useState(false)
+  const [copiedEvidence, setCopiedEvidence] = useState(false)
 
-  const handleCopy = () => {
+  // Real or demo data
+  const creatorAddr = pact?.creator || "0x8192A4789Bc09F32dE09B18a478cbed5efcaE784"
+  const recipientAddr = pact?.recipient || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
+  const amountDisplay = pact ? `${pact.amountFormatted} MON` : "5 MON"
+  const deadlineDisplay = pact?.deadlineFormatted || "18:00 UTC"
+  const createdAtDisplay = pact?.createdAtFormatted || "At Genesis"
+  const evidenceHash = pact?.evidenceHash || ""
+  const hasEvidence = pact?.hasEvidence
+
+  const handleCopyRecipient = () => {
     navigator.clipboard.writeText(recipientAddr)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setCopiedRecipient(true)
+    setTimeout(() => setCopiedRecipient(false), 2000)
+  }
+
+  const handleCopyCreator = () => {
+    navigator.clipboard.writeText(creatorAddr)
+    setCopiedCreator(true)
+    setTimeout(() => setCopiedCreator(false), 2000)
+  }
+
+  const handleCopyEvidence = () => {
+    if (!evidenceHash) return
+    navigator.clipboard.writeText(evidenceHash)
+    setCopiedEvidence(true)
+    setTimeout(() => setCopiedEvidence(false), 2000)
   }
 
   return (
-    <div className="rounded-xl bg-surface-low border border-outline-variant/50 p-5 shadow-lg flex flex-col gap-4 relative overflow-hidden">
+    <div className="rounded-xl bg-surface-low border border-outline-variant/50 p-5 shadow-lg flex flex-col gap-4 relative overflow-hidden text-left">
       <div className="flex items-center justify-between border-b border-outline-variant/30 pb-3">
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(168,85,247,0.7)]"></div>
           <h3 className="font-display text-base font-semibold text-white">Payment Obligation</h3>
         </div>
-        <span className="font-mono text-[11px] uppercase tracking-wider text-outline px-2 py-0.5 rounded bg-surface-container border border-outline-variant/40">
-          Pact Rule #{pactId.replace(/^P-/, "")}
-        </span>
+        <div className="flex items-center gap-2">
+          {isDemo && (
+            <span className="font-mono text-[9px] uppercase tracking-wider text-amber-300 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 font-semibold">
+              DEMO DATA
+            </span>
+          )}
+          <span className="font-mono text-[11px] uppercase tracking-wider text-outline px-2 py-0.5 rounded bg-surface-container border border-outline-variant/40">
+            Pact #{pact?.id || pactId.replace(/^P-/, "")}
+          </span>
+        </div>
       </div>
 
       {/* Key Obligation Metrics List */}
       <div className="flex flex-col gap-3 font-sans text-sm">
-        {/* WHO (From) */}
+        {/* FROM (Creator) */}
         <div className="p-3 rounded-lg bg-surface-container/60 border border-outline-variant/30 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-purple-950 border border-primary/30 flex items-center justify-center text-primary">
@@ -33,23 +64,36 @@ export default function PaymentObligationCard({ pactId = "P-1024" }) {
             <div>
               <div className="text-[11px] font-mono uppercase text-outline">From Originator</div>
               <div className="font-semibold text-white flex items-center gap-1.5">
-                <span>PaymentAgent-B</span>
-                <span className="text-xs font-mono text-outline-variant">(AI Agent)</span>
+                <span>{pact ? "Pact Creator" : "PaymentAgent-B"}</span>
+                <span className="text-xs font-mono text-outline-variant">
+                  {pact ? "(On-Chain)" : "(AI Agent)"}
+                </span>
               </div>
             </div>
           </div>
-          <div className="font-mono text-xs text-on-surface-variant bg-surface-high px-2 py-1 rounded">
-            0x8192...c09f
+          <div className="flex items-center gap-1.5 font-mono text-xs text-on-surface-variant bg-surface-high px-2 py-1 rounded">
+            <span>{shortenAddress(creatorAddr)}</span>
+            <button
+              onClick={handleCopyCreator}
+              className="text-outline hover:text-white transition-colors cursor-pointer"
+              title="Copy Creator Address"
+            >
+              <span className="material-symbols-outlined text-[13px]">
+                {copiedCreator ? "check" : "content_copy"}
+              </span>
+            </button>
           </div>
         </div>
 
-        {/* HOW MUCH & TOKEN */}
+        {/* AMOUNT & TOKEN */}
         <div className="p-3 rounded-lg bg-surface-container/60 border border-outline-variant/30 flex items-center justify-between">
           <div>
-            <div className="text-[11px] font-mono uppercase text-outline">Payment Amount &amp; Token</div>
+            <div className="text-[11px] font-mono uppercase text-outline">Escrow Deposit Amount</div>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="font-display text-2xl font-bold text-white tracking-tight">5 MON</span>
-              <span className="font-mono text-xs text-tertiary font-medium">≈ $18.40 USD</span>
+              <span className="font-display text-2xl font-bold text-white tracking-tight">
+                {amountDisplay}
+              </span>
+              <span className="font-mono text-xs text-tertiary font-medium">Native Token</span>
             </div>
           </div>
           <div className="text-right">
@@ -59,56 +103,91 @@ export default function PaymentObligationCard({ pactId = "P-1024" }) {
           </div>
         </div>
 
-        {/* TO WHOM (Recipient) */}
+        {/* RECIPIENT */}
         <div className="p-3 rounded-lg bg-surface-container/60 border border-outline-variant/30 flex flex-col gap-1.5">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-mono uppercase text-outline">Designated Recipient</span>
-            <span className="text-[10px] font-mono text-primary font-medium uppercase">Expected Address</span>
+            <span className="text-[10px] font-mono text-primary font-medium uppercase">
+              {pact ? "On-Chain Counterparty" : "Expected Address"}
+            </span>
           </div>
           <div className="flex items-center justify-between gap-2 bg-surface-high/80 px-2.5 py-1.5 rounded border border-outline-variant/40">
             <span className="font-mono text-xs text-white truncate font-medium">
               {recipientAddr}
             </span>
             <button
-              onClick={handleCopy}
-              className="text-outline hover:text-white transition-colors cursor-pointer"
+              onClick={handleCopyRecipient}
+              className="text-outline hover:text-white transition-colors cursor-pointer shrink-0"
               title="Copy Address"
             >
               <span className="material-symbols-outlined text-[15px]">
-                {copied ? "check" : "content_copy"}
+                {copiedRecipient ? "check" : "content_copy"}
               </span>
             </button>
           </div>
         </div>
 
-        {/* BY WHEN & ESCROW (2 col sub-grid) */}
-        <div className="grid grid-cols-2 gap-2.5">
+        {/* DEADLINE & CREATED TIMESTAMP */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
           {/* Deadline */}
           <div className="p-3 rounded-lg bg-surface-container/60 border border-outline-variant/30 flex flex-col justify-between">
-            <span className="text-[11px] font-mono uppercase text-outline">Deadline (UTC)</span>
+            <span className="text-[11px] font-mono uppercase text-outline">Expiration Deadline</span>
             <div className="mt-1">
-              <span className="font-mono text-sm font-bold text-white">18:00 UTC</span>
+              <span className="font-mono text-xs sm:text-sm font-bold text-white block truncate" title={deadlineDisplay}>
+                {deadlineDisplay}
+              </span>
               <div className="mt-1 flex items-center gap-1 font-mono text-[10px] text-tertiary">
                 <span className="material-symbols-outlined text-[13px]">alarm</span>
-                <span>Timelock Active</span>
+                <span>{pact?.isExpired ? "Deadline Expired" : "Timelock Active"}</span>
               </div>
             </div>
           </div>
 
-          {/* Escrow Collateral */}
+          {/* Creation Timestamp */}
           <div className="p-3 rounded-lg bg-surface-container/60 border border-primary/30 flex flex-col justify-between relative overflow-hidden">
             <div className="pointer-events-none absolute -right-4 -bottom-4 w-14 h-14 bg-primary-container/20 rounded-full blur-xl"></div>
             <span className="text-[11px] font-mono uppercase text-primary font-medium">
-              Escrow Collateral
+              Created Timestamp
             </span>
             <div className="mt-1">
-              <span className="font-mono text-sm font-bold text-primary">100 USDC</span>
+              <span className="font-mono text-xs sm:text-sm font-bold text-primary block truncate" title={createdAtDisplay}>
+                {createdAtDisplay}
+              </span>
               <div className="mt-1 text-[10px] font-sans text-on-surface-variant">
-                Isolated Non-Custodial Vault
+                Block State Recorded
               </div>
             </div>
           </div>
         </div>
+
+        {/* Cryptographic Evidence Hash (if available) */}
+        {hasEvidence && (
+          <div className="p-3 rounded-lg bg-surface-container/60 border border-cyan/30 flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono uppercase text-cyan font-semibold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">fingerprint</span>
+                Cryptographic Evidence Hash
+              </span>
+              <span className="text-[10px] font-mono text-cyan bg-cyan/10 px-1.5 py-0.5 rounded border border-cyan/20">
+                SUBMITTED
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 bg-surface-high/80 px-2.5 py-1.5 rounded border border-outline-variant/40">
+              <span className="font-mono text-xs text-white truncate">
+                {evidenceHash}
+              </span>
+              <button
+                onClick={handleCopyEvidence}
+                className="text-outline hover:text-white transition-colors cursor-pointer shrink-0"
+                title="Copy Evidence Hash"
+              >
+                <span className="material-symbols-outlined text-[15px]">
+                  {copiedEvidence ? "check" : "content_copy"}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
