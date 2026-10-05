@@ -81,14 +81,26 @@ Evaluate the evidence strictly and return the JSON outcome matching the schema.
   try {
     const ai = new GoogleGenAI({ apiKey })
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-      },
-    })
+    let response
+    try {
+      response = await ai.models.generateContent({
+        model: "gemini-3.5-flash-lite",
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+        },
+      })
+    } catch {
+      response = await ai.models.generateContent({
+        model: "gemini-3.1-flash-lite",
+        contents: prompt,
+        config: {
+          systemInstruction,
+          responseMimeType: "application/json",
+        },
+      })
+    }
 
     const rawText = response.text ? response.text.trim() : ""
     let parsed

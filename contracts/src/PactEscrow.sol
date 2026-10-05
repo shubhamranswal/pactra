@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 /**
  * @title PactEscrow
- * @notice Native token escrow contract for PACTRA machine-verifiable agreements.
+ * @notice Native token escrow contract for PACTRA machine-verifiable agreements (V2).
+ * Supports autonomous AI verification attestation and automated escrow resolution.
  */
 contract PactEscrow {
     enum PactStatus {
@@ -11,6 +12,12 @@ contract PactEscrow {
         Submitted,
         Settled,
         Refunded
+    }
+
+    enum VerificationResult {
+        None,
+        Approved,
+        Rejected
     }
 
     struct Pact {
@@ -23,11 +30,16 @@ contract PactEscrow {
         uint256 submittedAt;
         PactStatus status;
         bytes32 evidenceHash;
+        VerificationResult verificationResult;
+        bytes32 verificationHash;
     }
 
     // Constants
     uint256 public constant REVIEW_PERIOD = 3 days;
     uint256 public constant MAX_DURATION = 365 days;
+
+    // Immutables & Config
+    address public verifier;
 
     // Custom Errors
     error ZeroEscrowAmount();
@@ -47,6 +59,10 @@ contract PactEscrow {
     error ReviewPeriodActive();
     error TransferFailed();
     error ReentrancyGuardReentrant();
+    error UnauthorizedVerifier();
+    error InvalidVerifier();
+    error VerificationAlreadySubmitted();
+    error ZeroVerificationHash();
 
     // Events
     event PactCreated(
@@ -54,6 +70,8 @@ contract PactEscrow {
     );
 
     event EvidenceSubmitted(uint256 indexed pactId, address indexed recipient, bytes32 evidenceHash);
+
+    event EvidenceVerified(uint256 indexed pactId, bool approved, bytes32 verificationHash);
 
     event PactSettled(uint256 indexed pactId, address indexed recipient, uint256 amount);
 
@@ -71,6 +89,15 @@ contract PactEscrow {
         _locked = 2;
         _;
         _locked = 1;
+    }
+
+    /**
+     * @notice Initializes the contract with an authorized verifier address.
+     * @param _verifier Address authorized to submit machine verification verdicts.
+     */
+    constructor(address _verifier) {
+        if (_verifier == address(0)) revert InvalidVerifier();
+        verifier = _verifier;
     }
 
     /**
@@ -97,7 +124,9 @@ contract PactEscrow {
             deadline: deadline,
             submittedAt: 0,
             status: PactStatus.Funded,
-            evidenceHash: bytes32(0)
+            evidenceHash: bytes32(0),
+            verificationResult: VerificationResult.None,
+            verificationHash: bytes32(0)
         });
 
         emit PactCreated(pactId, msg.sender, recipient, msg.value, deadline);
@@ -128,7 +157,55 @@ contract PactEscrow {
     }
 
     /**
-     * @notice Settles a pact and releases escrow funds to the recipient.
+     * @notice Submits verification attestation by the authorized verifier.
+     * Automatically resolves escrow:
+     * - Approved: settles escrow funds directly to recipient.
+     * - Rejected: refunds escrow funds directly to creator.
+     * @param pactId ID of the pact to verify.
+     * @param approved Boolean verdict: true for Approved, false for Rejected.
+     * @param verificationHash Keccak-256 hash of the canonical verification verdict data.
+     */
+    function submitVerification(uint256 pactId, bool approved, bytes32 verificationHash) external nonReentrant {
+        if (msg.sender != verifier) revert UnauthorizedVerifier();
+        if (pactId == 0 || pactId > _pactIdCounter) revert PactDoesNotExist();
+        if (verificationHash == bytes32(0)) revert ZeroVerificationHash();
+
+        Pact storage pact = _pacts[pactId];
+
+        if (pact.status != PactStatus.Submitted) revert InvalidPactState();
+        if (pact.evidenceHash == bytes32(0)) revert EvidenceNotSubmitted();
+        if (pact.verificationResult != VerificationResult.None) revert VerificationAlreadySubmitted();
+
+        pact.verificationHash = verificationHash;
+        uint256 amount = pact.amount;
+
+        if (approved) {
+            // Checks-Effects-Interactions
+            pact.verificationResult = VerificationResult.Approved;
+            pact.status = PactStatus.Settled;
+            address recipient = pact.recipient;
+
+            emit EvidenceVerified(pactId, true, verificationHash);
+            emit PactSettled(pactId, recipient, amount);
+
+            (bool success,) = recipient.call{value: amount}("");
+            if (!success) revert TransferFailed();
+        } else {
+            // Checks-Effects-Interactions
+            pact.verificationResult = VerificationResult.Rejected;
+            pact.status = PactStatus.Refunded;
+            address creator = pact.creator;
+
+            emit EvidenceVerified(pactId, false, verificationHash);
+            emit PactRefunded(pactId, creator, amount);
+
+            (bool success,) = creator.call{value: amount}("");
+            if (!success) revert TransferFailed();
+        }
+    }
+
+    /**
+     * @notice Settles a pact and releases escrow funds to the recipient (creator manual settlement).
      * @param pactId ID of the pact to settle.
      */
     function settlePact(uint256 pactId) external nonReentrant {

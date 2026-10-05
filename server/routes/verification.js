@@ -8,6 +8,7 @@ import {
   storeEvidence,
   getEvidence,
 } from "../services/evidenceService.js"
+import { relayVerificationToContract } from "../services/verificationRelayer.js"
 
 const router = Router()
 
@@ -172,12 +173,28 @@ router.post("/verify-evidence", async (req, res) => {
       ...(geminiResult.checks || []),
     ]
 
+    // 8. Phase 8: Trigger automated on-chain resolution via authorized verifier relayer
+    let attestation = {
+      relayed: false,
+      reason: "NEEDS_REVIEW verdict does not trigger automated on-chain settlement.",
+    }
+
+    if (geminiResult.verdict === "APPROVED" || geminiResult.verdict === "REJECTED") {
+      attestation = await relayVerificationToContract({
+        pactId: Number(pactId),
+        evidenceHash: calculatedHash,
+        verdict: geminiResult.verdict,
+        confidence: geminiResult.confidence,
+      })
+    }
+
     return res.json({
       pactId: Number(pactId),
       verdict: geminiResult.verdict,
       confidence: geminiResult.confidence,
       reason: geminiResult.reason,
       checks: combinedChecks,
+      attestation,
     })
   } catch (err) {
     console.error("Verification API Error:", err)

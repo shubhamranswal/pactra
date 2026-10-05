@@ -61,8 +61,8 @@ export default function PactDetails() {
 
   // Derive mode directly from real contract status and AI verification result
   const derivedMode = useMemo(() => {
-    if (verificationResult?.verdict === "APPROVED") return "passed"
-    if (verificationResult?.verdict === "REJECTED" || verificationResult?.verdict === "EVIDENCE_HASH_MISMATCH") return "mismatch"
+    if (pact?.verificationResult === 1 || verificationResult?.verdict === "APPROVED") return "passed"
+    if (pact?.verificationResult === 2 || verificationResult?.verdict === "REJECTED" || verificationResult?.verdict === "EVIDENCE_HASH_MISMATCH") return "mismatch"
     if (verificationResult?.verdict === "NEEDS_REVIEW") return "verifying"
     if (pact) {
       if (pact.status === 2) return "passed"
@@ -360,6 +360,7 @@ export default function PactDetails() {
                   pact={pact}
                   pactId={pact?.id || cleanId || id}
                   onVerificationComplete={(res) => setVerificationResult(res)}
+                  onPactUpdated={() => refetch()}
                   isDemo={isDemo}
                 />
                 <InvariantsChecklist

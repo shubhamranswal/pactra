@@ -37,6 +37,54 @@ export default function PaymentObligationCard({ pact, pactId, isDemo = false }) 
     setTimeout(() => setCopiedEvidence(false), 2000)
   }
 
+  const [copiedVerification, setCopiedVerification] = useState(false)
+
+  // Derive Payment Card Status (PART 10 UI STATES)
+  const getPaymentState = () => {
+    if (pact?.status === 2 || pact?.verificationResult === 1) {
+      return {
+        label: "SETTLED",
+        badgeClass: "bg-emerald-500/15 border-emerald-500/40 text-emerald-400",
+        icon: "check_circle",
+      }
+    }
+    if (pact?.status === 3 || pact?.verificationResult === 2) {
+      return {
+        label: "REFUNDED",
+        badgeClass: "bg-rose-500/15 border-rose-500/40 text-rose-400",
+        icon: "undo",
+      }
+    }
+    if (pact?.isExpired && pact?.status === 0) {
+      return {
+        label: "REFUNDABLE",
+        badgeClass: "bg-amber-500/15 border-amber-500/40 text-amber-300",
+        icon: "warning",
+      }
+    }
+    if (pact?.status === 1) {
+      return {
+        label: "SETTLING",
+        badgeClass: "bg-sky-500/15 border-sky-500/40 text-sky-400",
+        icon: "hourglass_top",
+      }
+    }
+    return {
+      label: "ESCROWED",
+      badgeClass: "bg-primary/20 border-primary/40 text-primary-light",
+      icon: "lock",
+    }
+  }
+
+  const paymentState = getPaymentState()
+
+  const handleCopyVerification = () => {
+    if (!pact?.verificationHash) return
+    navigator.clipboard.writeText(pact.verificationHash)
+    setCopiedVerification(true)
+    setTimeout(() => setCopiedVerification(false), 2000)
+  }
+
   const numericPactId = pact?.id || (pactId ? String(pactId).replace(/^[#P-]+/, "") : "")
 
   return (
@@ -47,6 +95,10 @@ export default function PaymentObligationCard({ pact, pactId, isDemo = false }) 
           <h3 className="font-display text-base font-semibold text-white">Payment Obligation</h3>
         </div>
         <div className="flex items-center gap-2">
+          <span className={`font-mono text-[10px] font-semibold px-2 py-0.5 rounded border flex items-center gap-1 ${paymentState.badgeClass}`}>
+            <span className="material-symbols-outlined text-[12px]">{paymentState.icon}</span>
+            <span>{paymentState.label}</span>
+          </span>
           {isDemo && (
             <span className="font-mono text-[9px] uppercase tracking-wider text-amber-300 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/30 font-semibold">
               DEMO DATA
@@ -218,6 +270,39 @@ export default function PaymentObligationCard({ pact, pactId, isDemo = false }) 
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ON-CHAIN VERIFICATION ATTESTATION HASH (If verified) */}
+        {pact?.hasVerification && (
+          <div className="p-3 rounded-lg bg-surface-container/60 border border-primary/40 flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-mono uppercase text-primary-light font-semibold flex items-center gap-1">
+                <span className="material-symbols-outlined text-[14px]">verified</span>
+                On-Chain Verifier Attestation Hash
+              </span>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold border ${
+                pact.verificationResult === 1
+                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-400"
+                  : "bg-rose-500/15 border-rose-500/40 text-rose-400"
+              }`}>
+                {pact.verificationResultLabel?.toUpperCase() || "ATTESTED"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 bg-surface-high/80 px-2.5 py-1.5 rounded border border-outline-variant/40 mt-1">
+              <span className="font-mono text-xs text-primary truncate" title={pact.verificationHash}>
+                {pact.verificationHash}
+              </span>
+              <button
+                onClick={handleCopyVerification}
+                className="text-outline hover:text-white transition-colors cursor-pointer shrink-0"
+                title="Copy Verification Hash"
+              >
+                <span className="material-symbols-outlined text-[15px]">
+                  {copiedVerification ? "check" : "content_copy"}
+                </span>
+              </button>
+            </div>
           </div>
         )}
       </div>

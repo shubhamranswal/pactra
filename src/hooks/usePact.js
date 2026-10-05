@@ -1,7 +1,8 @@
 import { useState } from "react"
-import { useReadContract } from "wagmi"
+import { useQuery } from "@tanstack/react-query"
+import { usePublicClient } from "wagmi"
 import { formatEther } from "viem"
-import { PACT_ESCROW_ADDRESS, PACT_ESCROW_ABI, isPactEscrowConfigured } from "../config/contracts"
+import { PACT_ESCROW_ADDRESS, PACT_ESCROW_ABI, PACT_ESCROW_V1_ABI, isPactEscrowConfigured } from "../config/contracts"
 
 export const PACT_STATUS = {
   FUNDED: 0,
@@ -74,21 +75,42 @@ export function usePact(pactId) {
     }
   }
 
+  const publicClient = usePublicClient()
+
   const {
     data: rawPact,
     isLoading,
     isError,
     error,
     refetch,
-  } = useReadContract({
-    address: PACT_ESCROW_ADDRESS,
-    abi: PACT_ESCROW_ABI,
-    functionName: "getPact",
-    args: cleanId !== null ? [cleanId] : undefined,
-    query: {
-      enabled: Boolean(isPactEscrowConfigured && cleanId !== null && !isInvalidId),
-      retry: 1,
+  } = useQuery({
+    queryKey: ["pact-detail", PACT_ESCROW_ADDRESS, cleanId?.toString()],
+    queryFn: async () => {
+      if (!isPactEscrowConfigured || cleanId === null || !publicClient) return null
+      try {
+        return await publicClient.readContract({
+          address: PACT_ESCROW_ADDRESS,
+          abi: PACT_ESCROW_ABI,
+          functionName: "getPact",
+          args: [cleanId],
+        })
+      } catch {
+        // Fallback for V1 contracts (288-byte struct)
+        const fallback = await publicClient.readContract({
+          address: PACT_ESCROW_ADDRESS,
+          abi: PACT_ESCROW_V1_ABI,
+          functionName: "getPact",
+          args: [cleanId],
+        })
+        return {
+          ...fallback,
+          verificationResult: 0,
+          verificationHash: ZERO_HASH,
+        }
+      }
     },
+    enabled: Boolean(isPactEscrowConfigured && cleanId !== null && !isInvalidId),
+    retry: 1,
   })
 
   // Detect not-found (PactDoesNotExist) versus other RPC connection errors
@@ -125,6 +147,13 @@ export function usePact(pactId) {
     const submittedAtNumber = Number(rawPact.submittedAt)
     const hasSubmitted = submittedAtNumber > 0
 
+    const verificationResultCode = Number(rawPact.verificationResult || 0)
+    const hasVerification = Boolean(
+      rawPact.verificationHash &&
+      rawPact.verificationHash !== ZERO_HASH &&
+      rawPact.verificationHash.length > 2
+    )
+
     pact = {
       id: rawPact.id.toString(),
       displayId: `#${rawPact.id.toString()}`,
@@ -141,6 +170,11 @@ export function usePact(pactId) {
       statusLabel: statusInfo.label,
       evidenceHash: rawPact.evidenceHash,
       hasEvidence,
+      verificationResult: verificationResultCode,
+      verificationResultLabel:
+        verificationResultCode === 1 ? "Approved" : verificationResultCode === 2 ? "Rejected" : "None",
+      verificationHash: rawPact.verificationHash || ZERO_HASH,
+      hasVerification,
       createdAtFormatted: rawPact.createdAt && Number(rawPact.createdAt) > 0
         ? new Date(Number(rawPact.createdAt) * 1000).toLocaleString("en-US", {
             timeZone: "UTC",

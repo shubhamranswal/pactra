@@ -2,7 +2,7 @@ import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { usePublicClient } from "wagmi"
 import { formatEther } from "viem"
-import { PACT_ESCROW_ADDRESS, PACT_ESCROW_ABI, isPactEscrowConfigured } from "../config/contracts"
+import { PACT_ESCROW_ADDRESS, PACT_ESCROW_ABI, PACT_ESCROW_V1_ABI, isPactEscrowConfigured } from "../config/contracts"
 import { PACT_STATUS_INFO } from "./usePact"
 import { shortenAddress } from "../utils/address"
 
@@ -69,16 +69,31 @@ export function usePacts() {
       }
       const allIds = Array.from(idSet).sort((a, b) => b - a) // newest first
 
-      // 3. Read each pact using getPact(pactId)
+      // 3. Read each pact using getPact(pactId) with V2 -> V1 fallback
       const rawPacts = await Promise.all(
-        allIds.map((id) =>
-          publicClient.readContract({
-            address: PACT_ESCROW_ADDRESS,
-            abi: PACT_ESCROW_ABI,
-            functionName: "getPact",
-            args: [BigInt(id)],
-          })
-        )
+        allIds.map(async (id) => {
+          try {
+            return await publicClient.readContract({
+              address: PACT_ESCROW_ADDRESS,
+              abi: PACT_ESCROW_ABI,
+              functionName: "getPact",
+              args: [BigInt(id)],
+            })
+          } catch {
+            // Fallback for V1 contracts (288-byte struct)
+            const fallback = await publicClient.readContract({
+              address: PACT_ESCROW_ADDRESS,
+              abi: PACT_ESCROW_V1_ABI,
+              functionName: "getPact",
+              args: [BigInt(id)],
+            })
+            return {
+              ...fallback,
+              verificationResult: 0,
+              verificationHash: "0x0000000000000000000000000000000000000000000000000000000000000000",
+            }
+          }
+        })
       )
 
       const nowSeconds = Math.floor(Date.now() / 1000)
@@ -132,6 +147,13 @@ export function usePacts() {
             raw.evidenceHash &&
             raw.evidenceHash.length > 2 &&
             !raw.evidenceHash.startsWith("0x0000000000000000")
+          ),
+          verificationResult: Number(raw.verificationResult || 0),
+          verificationHash: raw.verificationHash,
+          hasVerification: Boolean(
+            raw.verificationHash &&
+            raw.verificationHash.length > 2 &&
+            !raw.verificationHash.startsWith("0x0000000000000000")
           ),
           isExpired,
         }

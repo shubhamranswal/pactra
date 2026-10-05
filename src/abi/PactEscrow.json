@@ -1,5 +1,16 @@
 [
   {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_verifier",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
     "type": "function",
     "name": "MAX_DURATION",
     "inputs": [],
@@ -122,6 +133,16 @@
             "name": "evidenceHash",
             "type": "bytes32",
             "internalType": "bytes32"
+          },
+          {
+            "name": "verificationResult",
+            "type": "uint8",
+            "internalType": "enum PactEscrow.VerificationResult"
+          },
+          {
+            "name": "verificationHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       }
@@ -186,6 +207,42 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "submitVerification",
+    "inputs": [
+      {
+        "name": "pactId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "approved",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "verificationHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "verifier",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "EvidenceSubmitted",
     "inputs": [
@@ -203,6 +260,31 @@
       },
       {
         "name": "evidenceHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EvidenceVerified",
+    "inputs": [
+      {
+        "name": "pactId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "approved",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "verificationHash",
         "type": "bytes32",
         "indexed": false,
         "internalType": "bytes32"
@@ -329,6 +411,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidVerifier",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "PactAlreadyRefunded",
     "inputs": []
   },
@@ -374,12 +461,27 @@
   },
   {
     "type": "error",
+    "name": "UnauthorizedVerifier",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "VerificationAlreadySubmitted",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ZeroEscrowAmount",
     "inputs": []
   },
   {
     "type": "error",
     "name": "ZeroEvidenceHash",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ZeroVerificationHash",
     "inputs": []
   }
 ]

@@ -21,6 +21,7 @@ app.get("/api/health", (req, res) => {
     service: "PACTRA Gemini Verification Agent Backend",
     timestamp: new Date().toISOString(),
     geminiKeyConfigured: Boolean(process.env.GEMINI_API_KEY),
+    verifierKeyConfigured: Boolean(process.env.VERIFIER_PRIVATE_KEY),
   })
 })
 
@@ -29,6 +30,7 @@ if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, () => {
     console.log(`[PACTRA Backend] Running on http://localhost:${PORT}`)
     console.log(`[PACTRA Backend] Gemini API Key status: ${process.env.GEMINI_API_KEY ? "CONFIGURED" : "MISSING (Set GEMINI_API_KEY in .env)"}`)
+    console.log(`[PACTRA Backend] Verifier Private Key status: ${process.env.VERIFIER_PRIVATE_KEY ? "CONFIGURED" : "MISSING (Set VERIFIER_PRIVATE_KEY in .env)"}`)
   })
 }
 

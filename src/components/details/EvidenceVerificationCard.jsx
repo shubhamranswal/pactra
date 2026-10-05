@@ -2,7 +2,13 @@ import { useState } from "react"
 import { useSubmitEvidence, calculateEvidenceHash } from "../../hooks/useSubmitEvidence"
 import { useWallet } from "../../hooks/useWallet"
 
-export default function EvidenceVerificationCard({ pact, pactId, onVerificationComplete, isDemo = false }) {
+export default function EvidenceVerificationCard({
+  pact,
+  pactId,
+  onVerificationComplete,
+  onPactUpdated,
+  isDemo = false,
+}) {
   const [evidenceInput, setEvidenceInput] = useState("")
   const [isVerifyingAI, setIsVerifyingAI] = useState(false)
   const [verificationResult, setVerificationResult] = useState(null)
@@ -30,12 +36,15 @@ export default function EvidenceVerificationCard({ pact, pactId, onVerificationC
         pactId: pact?.id || pactId,
         rawEvidence: evidenceInput,
       })
+      if (onPactUpdated) {
+        setTimeout(() => onPactUpdated(), 2000)
+      }
     } catch (err) {
       setUiError(err.message || "Failed to submit evidence on-chain.")
     }
   }
 
-  // Handle Gemini AI Verification Request to Backend Server
+  // Handle Gemini AI Verification Request to Backend Server (Triggers Phase 8 automated on-chain resolution)
   const handleRunAiVerification = async () => {
     setUiError("")
     setIsVerifyingAI(true)
@@ -56,6 +65,10 @@ export default function EvidenceVerificationCard({ pact, pactId, onVerificationC
       if (onVerificationComplete) {
         onVerificationComplete(data)
       }
+      if (data.attestation?.relayed && onPactUpdated) {
+        // Trigger live refetch to reflect automated on-chain settlement/refund
+        setTimeout(() => onPactUpdated(), 2000)
+      }
     } catch (err) {
       setUiError(`AI Verification API error: ${err.message}`)
     } finally {
@@ -63,19 +76,19 @@ export default function EvidenceVerificationCard({ pact, pactId, onVerificationC
     }
   }
 
-  // Derive Lifecycle State
+  // Derive Lifecycle State (PART 10 UI STATES: MISSING, SUBMITTED, VERIFYING, APPROVED, REJECTED, NEEDS REVIEW)
   const getLifecycleState = () => {
-    if (verificationResult?.verdict === "APPROVED") {
+    if (pact?.verificationResult === 1 || verificationResult?.verdict === "APPROVED") {
       return {
-        badgeText: "AI Verification Passed",
+        badgeText: "AI Verification Approved & Settled",
         tagText: "APPROVED",
         tagColor: "bg-emerald-500/15 border-emerald-500/40 text-emerald-400",
         icon: "verified",
       }
     }
-    if (verificationResult?.verdict === "REJECTED") {
+    if (pact?.verificationResult === 2 || verificationResult?.verdict === "REJECTED") {
       return {
-        badgeText: "AI Verification Failed",
+        badgeText: "AI Verification Rejected & Refunded",
         tagText: "REJECTED",
         tagColor: "bg-rose-500/15 border-rose-500/40 text-rose-400",
         icon: "cancel",
@@ -97,17 +110,25 @@ export default function EvidenceVerificationCard({ pact, pactId, onVerificationC
         icon: "warning",
       }
     }
+    if (isVerifyingAI) {
+      return {
+        badgeText: "AI Agent Verification In Progress",
+        tagText: "VERIFYING",
+        tagColor: "bg-sky-500/15 border-sky-500/40 text-sky-400",
+        icon: "psychology",
+      }
+    }
     if (hasSubmittedOnChain) {
       return {
         badgeText: "Evidence Commitment Recorded",
-        tagText: "VERIFYING",
-        tagColor: "bg-sky-500/15 border-sky-500/40 text-sky-400",
+        tagText: "SUBMITTED",
+        tagColor: "bg-cyan/15 border-cyan/40 text-cyan",
         icon: "schedule",
       }
     }
     return {
       badgeText: "Pending Evidence",
-      tagText: "EVIDENCE MISSING",
+      tagText: "MISSING",
       tagColor: "bg-surface-highest border-outline-variant text-outline",
       icon: "assignment_late",
     }
@@ -278,6 +299,61 @@ export default function EvidenceVerificationCard({ pact, pactId, onVerificationC
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Phase 8: Automated On-Chain Attestation & Settlement Outcome */}
+          {verificationResult.attestation && (
+            <div className={`p-3.5 rounded-lg border font-mono text-xs flex flex-col gap-2 ${
+              verificationResult.attestation.relayed
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
+                : "bg-surface-container/60 border-outline-variant/30 text-on-surface-variant"
+            }`}>
+              <div className="flex items-center justify-between font-semibold">
+                <span className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px]">
+                    {verificationResult.attestation.relayed ? "task_alt" : "info"}
+                  </span>
+                  {verificationResult.attestation.relayed
+                    ? "On-Chain Automated Resolution Broadcast"
+                    : "Automated Resolution Status"}
+                </span>
+                <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
+                  verificationResult.attestation.relayed
+                    ? "bg-emerald-500/20 text-emerald-300"
+                    : "bg-surface-high text-outline"
+                }`}>
+                  {verificationResult.attestation.relayed ? "BROADCAST SUCCESS" : "NOT RELAYED"}
+                </span>
+              </div>
+
+              {verificationResult.attestation.transactionHash && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pt-1 border-t border-emerald-500/20 text-[11px]">
+                  <span className="text-outline">Settlement TX Hash:</span>
+                  <a
+                    href={`https://testnet.monadexplorer.com/tx/${verificationResult.attestation.transactionHash}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:underline font-mono truncate max-w-[240px] flex items-center gap-1"
+                  >
+                    <span>{verificationResult.attestation.transactionHash}</span>
+                    <span className="material-symbols-outlined text-[13px]">open_in_new</span>
+                  </a>
+                </div>
+              )}
+
+              {verificationResult.attestation.verifierAddress && (
+                <div className="flex justify-between items-center text-[11px]">
+                  <span className="text-outline">Authorized Verifier:</span>
+                  <span className="text-white font-mono">{verificationResult.attestation.verifierAddress.slice(0, 10)}...{verificationResult.attestation.verifierAddress.slice(-8)}</span>
+                </div>
+              )}
+
+              {verificationResult.attestation.reason && (
+                <p className="text-[11px] text-on-surface-variant italic">
+                  {verificationResult.attestation.reason}
+                </p>
+              )}
             </div>
           )}
         </div>

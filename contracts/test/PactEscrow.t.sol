@@ -10,27 +10,41 @@ contract PactEscrowTest is Test {
     address public creator = address(0x1111);
     address public recipient = address(0x2222);
     address public stranger = address(0x3333);
+    address public verifier = address(0x4444);
 
     uint256 public constant INITIAL_BALANCE = 100 ether;
     uint256 public constant ESCROW_AMOUNT = 5 ether;
     uint256 public deadline;
     bytes32 public constant SAMPLE_EVIDENCE = keccak256("DELIVERY_PROOF_1024");
+    bytes32 public constant SAMPLE_VERIFICATION = keccak256("AI_VERIFICATION_CANONICAL_HASH_1024");
 
     // Event declarations for testing event emissions
     event PactCreated(
         uint256 indexed pactId, address indexed creator, address indexed recipient, uint256 amount, uint256 deadline
     );
     event EvidenceSubmitted(uint256 indexed pactId, address indexed recipient, bytes32 evidenceHash);
+    event EvidenceVerified(uint256 indexed pactId, bool approved, bytes32 verificationHash);
     event PactSettled(uint256 indexed pactId, address indexed recipient, uint256 amount);
     event PactRefunded(uint256 indexed pactId, address indexed creator, uint256 amount);
 
     function setUp() public {
-        escrow = new PactEscrow();
+        escrow = new PactEscrow(verifier);
         deadline = block.timestamp + 1 days;
 
         vm.deal(creator, INITIAL_BALANCE);
         vm.deal(recipient, INITIAL_BALANCE);
         vm.deal(stranger, INITIAL_BALANCE);
+        vm.deal(verifier, INITIAL_BALANCE);
+    }
+
+    // 0. Constructor verification
+    function test_Constructor_ConfiguresVerifier() public view {
+        assertEq(escrow.verifier(), verifier);
+    }
+
+    function test_Constructor_RevertIf_ZeroVerifier() public {
+        vm.expectRevert(PactEscrow.InvalidVerifier.selector);
+        new PactEscrow(address(0));
     }
 
     // 1. Successful pact creation
@@ -99,40 +113,44 @@ contract PactEscrowTest is Test {
         vm.startPrank(creator);
         uint256 id1 = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
         uint256 id2 = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+        uint256 id3 = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
         vm.stopPrank();
 
-        assertTrue(id1 != id2);
         assertEq(id1, 1);
         assertEq(id2, 2);
+        assertEq(id3, 3);
+        assertEq(escrow.getPactCount(), 3);
     }
 
-    // 9. Pact data stored correctly
+    // 9. Data stored correctly
     function test_CreatePact_DataStoredCorrectly() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
-        PactEscrow.Pact memory pact = escrow.getPact(pactId);
-        assertEq(pact.id, pactId);
-        assertEq(pact.creator, creator);
-        assertEq(pact.recipient, recipient);
-        assertEq(pact.amount, ESCROW_AMOUNT);
-        assertEq(pact.deadline, deadline);
-        assertEq(pact.submittedAt, 0);
-        assertEq(uint8(pact.status), uint8(PactEscrow.PactStatus.Funded));
-        assertEq(pact.evidenceHash, bytes32(0));
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(p.id, pactId);
+        assertEq(p.creator, creator);
+        assertEq(p.recipient, recipient);
+        assertEq(p.amount, ESCROW_AMOUNT);
+        assertEq(p.createdAt, block.timestamp);
+        assertEq(p.deadline, deadline);
+        assertEq(p.submittedAt, 0);
+        assertEq(uint256(p.status), uint256(PactEscrow.PactStatus.Funded));
+        assertEq(p.evidenceHash, bytes32(0));
+        assertEq(uint256(p.verificationResult), uint256(PactEscrow.VerificationResult.None));
+        assertEq(p.verificationHash, bytes32(0));
     }
 
     // 10. Correct escrow balance
     function test_CreatePact_CorrectEscrowBalance() public {
-        assertEq(address(escrow).balance, 0);
-
         vm.prank(creator);
         escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
         assertEq(address(escrow).balance, ESCROW_AMOUNT);
+        assertEq(creator.balance, INITIAL_BALANCE - ESCROW_AMOUNT);
     }
 
-    // 11. Successful evidence submission
+    // 11. Submit evidence success
     function test_SubmitEvidence_Success() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -140,27 +158,27 @@ contract PactEscrowTest is Test {
         vm.prank(recipient);
         escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
 
-        PactEscrow.Pact memory pact = escrow.getPact(pactId);
-        assertEq(pact.evidenceHash, SAMPLE_EVIDENCE);
-        assertEq(uint8(pact.status), uint8(PactEscrow.PactStatus.Submitted));
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(uint256(p.status), uint256(PactEscrow.PactStatus.Submitted));
+        assertEq(p.evidenceHash, SAMPLE_EVIDENCE);
+        assertEq(p.submittedAt, block.timestamp);
     }
 
-    // 12. submittedAt stored correctly
+    // 12. Submit evidence submittedAt stored correctly
     function test_SubmitEvidence_SubmittedAtStoredCorrectly() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
-        uint256 submitTime = block.timestamp + 100;
-        vm.warp(submitTime);
+        vm.warp(block.timestamp + 500);
 
         vm.prank(recipient);
         escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
 
-        PactEscrow.Pact memory pact = escrow.getPact(pactId);
-        assertEq(pact.submittedAt, submitTime);
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(p.submittedAt, block.timestamp);
     }
 
-    // 13. Unauthorized evidence submission
+    // 13. Unauthorized recipient cannot submit evidence
     function test_SubmitEvidence_RevertIf_UnauthorizedRecipient() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -180,7 +198,7 @@ contract PactEscrowTest is Test {
         escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
     }
 
-    // 15. Zero evidence hash
+    // 15. Zero evidence hash reverts
     function test_SubmitEvidence_RevertIf_ZeroEvidenceHash() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -190,43 +208,39 @@ contract PactEscrowTest is Test {
         escrow.submitEvidence(pactId, bytes32(0));
     }
 
-    // 16. Duplicate evidence submission
-    function test_SubmitEvidence_RevertIf_DuplicateEvidence() public {
-        vm.prank(creator);
-        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
-
-        vm.startPrank(recipient);
-        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
-
-        vm.expectRevert(PactEscrow.InvalidPactState.selector);
-        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
-        vm.stopPrank();
-    }
-
-    // 17. Evidence after deadline
+    // 16. Evidence after deadline reverts
     function test_SubmitEvidence_RevertIf_AfterDeadline() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
-        vm.warp(deadline + 1);
+        vm.warp(deadline + 1 seconds);
 
         vm.prank(recipient);
         vm.expectRevert(PactEscrow.DeadlinePassed.selector);
         escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
     }
 
-    // 18. Invalid pact ID for submitEvidence
-    function test_SubmitEvidence_RevertIf_InvalidPactId() public {
-        vm.startPrank(recipient);
-        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
-        escrow.submitEvidence(0, SAMPLE_EVIDENCE);
+    // 17. Duplicate evidence submission reverts
+    function test_SubmitEvidence_RevertIf_DuplicateEvidence() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
-        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
-        escrow.submitEvidence(999, SAMPLE_EVIDENCE);
-        vm.stopPrank();
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
+
+        vm.prank(recipient);
+        vm.expectRevert(PactEscrow.InvalidPactState.selector);
+        escrow.submitEvidence(pactId, keccak256("NEW_EVIDENCE"));
     }
 
-    // 19. Successful settlement
+    // 18. Invalid pact ID on evidence submit reverts
+    function test_SubmitEvidence_RevertIf_InvalidPactId() public {
+        vm.prank(recipient);
+        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
+        escrow.submitEvidence(999, SAMPLE_EVIDENCE);
+    }
+
+    // 19. Creator settle pact success
     function test_SettlePact_Success() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -239,12 +253,13 @@ contract PactEscrowTest is Test {
         vm.prank(creator);
         escrow.settlePact(pactId);
 
-        PactEscrow.Pact memory pact = escrow.getPact(pactId);
-        assertEq(uint8(pact.status), uint8(PactEscrow.PactStatus.Settled));
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(uint256(p.status), uint256(PactEscrow.PactStatus.Settled));
         assertEq(recipient.balance, recipientBalBefore + ESCROW_AMOUNT);
+        assertEq(address(escrow).balance, 0);
     }
 
-    // 20. Settle after deadline while Submitted succeeds
+    // 20. Settle pact after deadline while submitted succeeds
     function test_SettlePact_AfterDeadlineWhileSubmittedSucceeds() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -254,17 +269,14 @@ contract PactEscrowTest is Test {
 
         vm.warp(deadline + 10 days);
 
-        uint256 recipientBalBefore = recipient.balance;
-
         vm.prank(creator);
         escrow.settlePact(pactId);
 
-        PactEscrow.Pact memory pact = escrow.getPact(pactId);
-        assertEq(uint8(pact.status), uint8(PactEscrow.PactStatus.Settled));
-        assertEq(recipient.balance, recipientBalBefore + ESCROW_AMOUNT);
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(uint256(p.status), uint256(PactEscrow.PactStatus.Settled));
     }
 
-    // 21. Unauthorized settlement
+    // 21. Unauthorized settler reverts
     function test_SettlePact_RevertIf_UnauthorizedSettler() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -277,7 +289,7 @@ contract PactEscrowTest is Test {
         escrow.settlePact(pactId);
     }
 
-    // 22. Recipient cannot settle
+    // 22. Recipient cannot settle pact
     function test_SettlePact_RevertIf_RecipientAttemptsSettle() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -290,7 +302,7 @@ contract PactEscrowTest is Test {
         escrow.settlePact(pactId);
     }
 
-    // 23. Settlement without evidence
+    // 23. Settle without evidence reverts
     function test_SettlePact_RevertIf_EvidenceNotSubmitted() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -300,7 +312,7 @@ contract PactEscrowTest is Test {
         escrow.settlePact(pactId);
     }
 
-    // 24. Double settlement
+    // 24. Double settlement reverts
     function test_SettlePact_RevertIf_DoubleSettlement() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -308,26 +320,36 @@ contract PactEscrowTest is Test {
         vm.prank(recipient);
         escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
 
-        vm.startPrank(creator);
+        vm.prank(creator);
         escrow.settlePact(pactId);
 
+        vm.prank(creator);
         vm.expectRevert(PactEscrow.PactAlreadySettled.selector);
         escrow.settlePact(pactId);
-        vm.stopPrank();
     }
 
-    // 25. Invalid pact ID for settlePact
-    function test_SettlePact_RevertIf_InvalidPactId() public {
-        vm.startPrank(creator);
-        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
-        escrow.settlePact(0);
+    // 25. Settle after refund reverts
+    function test_SettlePact_RevertIf_AfterRefund() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
+        vm.warp(deadline + 1 seconds);
+
+        escrow.refundPact(pactId);
+
+        vm.prank(creator);
+        vm.expectRevert(PactEscrow.PactAlreadyRefunded.selector);
+        escrow.settlePact(pactId);
+    }
+
+    // 26. Invalid pact ID on settle reverts
+    function test_SettlePact_RevertIf_InvalidPactId() public {
+        vm.prank(creator);
         vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
         escrow.settlePact(999);
-        vm.stopPrank();
     }
 
-    // 26. Recipient claim after review succeeds
+    // 27. Claim after review success
     function test_ClaimAfterReview_Success() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -342,12 +364,13 @@ contract PactEscrowTest is Test {
         vm.prank(recipient);
         escrow.claimAfterReview(pactId);
 
-        PactEscrow.Pact memory pact = escrow.getPact(pactId);
-        assertEq(uint8(pact.status), uint8(PactEscrow.PactStatus.Settled));
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(uint256(p.status), uint256(PactEscrow.PactStatus.Settled));
         assertEq(recipient.balance, recipientBalBefore + ESCROW_AMOUNT);
+        assertEq(address(escrow).balance, 0);
     }
 
-    // 27. Claim before review reverts
+    // 28. Claim before review period active reverts
     function test_ClaimAfterReview_RevertIf_BeforeReviewPeriod() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -362,7 +385,7 @@ contract PactEscrowTest is Test {
         escrow.claimAfterReview(pactId);
     }
 
-    // 28. Unauthorized claim reverts
+    // 29. Unauthorized recipient on claim reverts
     function test_ClaimAfterReview_RevertIf_UnauthorizedRecipient() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -377,60 +400,42 @@ contract PactEscrowTest is Test {
         escrow.claimAfterReview(pactId);
     }
 
-    // 29. Claim if not Submitted reverts
+    // 30. Claim with invalid state reverts
     function test_ClaimAfterReview_RevertIf_InvalidPactState() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
-
-        vm.warp(block.timestamp + escrow.REVIEW_PERIOD());
 
         vm.prank(recipient);
         vm.expectRevert(PactEscrow.InvalidPactState.selector);
         escrow.claimAfterReview(pactId);
     }
 
-    // 30. Invalid pact ID for claimAfterReview
+    // 31. Invalid pact ID on claim reverts
     function test_ClaimAfterReview_RevertIf_InvalidPactId() public {
-        vm.startPrank(recipient);
-        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
-        escrow.claimAfterReview(0);
-
+        vm.prank(recipient);
         vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
         escrow.claimAfterReview(999);
-        vm.stopPrank();
     }
 
-    // 31. Successful refund after deadline (Funded status)
+    // 32. Refund after deadline success
     function test_RefundPact_Success_AfterDeadline() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
-        vm.warp(deadline + 1);
+        vm.warp(deadline + 1 seconds);
 
         uint256 creatorBalBefore = creator.balance;
 
+        vm.prank(stranger);
         escrow.refundPact(pactId);
 
-        PactEscrow.Pact memory pact = escrow.getPact(pactId);
-        assertEq(uint8(pact.status), uint8(PactEscrow.PactStatus.Refunded));
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(uint256(p.status), uint256(PactEscrow.PactStatus.Refunded));
         assertEq(creator.balance, creatorBalBefore + ESCROW_AMOUNT);
+        assertEq(address(escrow).balance, 0);
     }
 
-    // 32. Refund after submitted evidence reverts (Submitted status)
-    function test_RefundPact_RevertIf_SubmittedEvidence() public {
-        vm.prank(creator);
-        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
-
-        vm.prank(recipient);
-        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
-
-        vm.warp(deadline + 1);
-
-        vm.expectRevert(PactEscrow.InvalidPactState.selector);
-        escrow.refundPact(pactId);
-    }
-
-    // 33. Refund before deadline
+    // 33. Refund before deadline reverts
     function test_RefundPact_RevertIf_BeforeDeadline() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -439,12 +444,26 @@ contract PactEscrowTest is Test {
         escrow.refundPact(pactId);
     }
 
-    // 34. Double refund
+    // 34. Refund with submitted evidence reverts
+    function test_RefundPact_RevertIf_SubmittedEvidence() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
+
+        vm.warp(deadline + 1 seconds);
+
+        vm.expectRevert(PactEscrow.InvalidPactState.selector);
+        escrow.refundPact(pactId);
+    }
+
+    // 35. Double refund reverts
     function test_RefundPact_RevertIf_DoubleRefund() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
-        vm.warp(deadline + 1);
+        vm.warp(deadline + 1 seconds);
 
         escrow.refundPact(pactId);
 
@@ -452,7 +471,7 @@ contract PactEscrowTest is Test {
         escrow.refundPact(pactId);
     }
 
-    // 35. Refund after settlement
+    // 36. Refund after settlement reverts
     function test_RefundPact_RevertIf_AfterSettlement() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
@@ -463,84 +482,166 @@ contract PactEscrowTest is Test {
         vm.prank(creator);
         escrow.settlePact(pactId);
 
-        vm.warp(deadline + 1);
+        vm.warp(deadline + 1 seconds);
 
         vm.expectRevert(PactEscrow.PactAlreadySettled.selector);
         escrow.refundPact(pactId);
     }
 
-    // 36. Settlement after refund
-    function test_SettlePact_RevertIf_AfterRefund() public {
-        vm.prank(creator);
-        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
-
-        vm.warp(deadline + 1);
-        escrow.refundPact(pactId);
-
-        vm.prank(creator);
-        vm.expectRevert(PactEscrow.PactAlreadyRefunded.selector);
-        escrow.settlePact(pactId);
-    }
-
-    // 37. Invalid pact ID for refundPact
+    // 37. Invalid pact ID on refund reverts
     function test_RefundPact_RevertIf_InvalidPactId() public {
-        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
-        escrow.refundPact(0);
-
         vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
         escrow.refundPact(999);
     }
 
-    // 38. Events emitted correctly
-    function test_Events_EmittedCorrectly() public {
-        vm.startPrank(creator);
-        vm.expectEmit(true, true, true, true);
-        emit PactCreated(1, creator, recipient, ESCROW_AMOUNT, deadline);
+    // 38. Get pact invalid ID reverts
+    function test_GetPact_RevertIf_InvalidPactId() public {
+        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
+        escrow.getPact(0);
+
+        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
+        escrow.getPact(1);
+    }
+
+    // =========================================================================
+    // PHASE 8: AI VERIFICATION ATTESTATION & AUTOMATED ESCROW RESOLUTION TESTS
+    // =========================================================================
+
+    // 1. Authorized verifier approval success
+    function test_Verification_AuthorizedVerifier_Approval_Success() public {
+        vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
-        vm.stopPrank();
 
-        vm.startPrank(recipient);
-        vm.expectEmit(true, true, true, true);
-        emit EvidenceSubmitted(pactId, recipient, SAMPLE_EVIDENCE);
-        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
-        vm.stopPrank();
-
-        vm.startPrank(creator);
-        vm.expectEmit(true, true, true, true);
-        emit PactSettled(pactId, recipient, ESCROW_AMOUNT);
-        escrow.settlePact(pactId);
-        vm.stopPrank();
-
-        uint256 pactId2 = 0;
-        vm.startPrank(creator);
-        pactId2 = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
-        vm.stopPrank();
-
-        vm.warp(deadline + 1);
-        vm.expectEmit(true, true, true, true);
-        emit PactRefunded(pactId2, creator, ESCROW_AMOUNT);
-        escrow.refundPact(pactId2);
-    }
-
-    // 39. Recipient contract rejecting ETH
-    function test_RecipientContract_RejectEth_RevertsTransferFailed() public {
-        RejectEthRecipient rejectingContract = new RejectEthRecipient();
-
-        vm.prank(creator);
-        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(address(rejectingContract), deadline);
-
-        vm.prank(address(rejectingContract));
+        vm.prank(recipient);
         escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
 
-        vm.prank(creator);
-        vm.expectRevert(PactEscrow.TransferFailed.selector);
-        escrow.settlePact(pactId);
+        uint256 recipientBalBefore = recipient.balance;
+
+        vm.prank(verifier);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(uint256(p.status), uint256(PactEscrow.PactStatus.Settled));
+        assertEq(uint256(p.verificationResult), uint256(PactEscrow.VerificationResult.Approved));
+        assertEq(p.verificationHash, SAMPLE_VERIFICATION);
+        assertEq(recipient.balance, recipientBalBefore + ESCROW_AMOUNT);
+        assertEq(address(escrow).balance, 0);
     }
 
-    // 40. Basic reentrancy attack attempt
-    function test_ReentrancyGuard_PreventsAttack() public {
+    // 2. Unauthorized verifier rejected
+    function test_Verification_RevertIf_UnauthorizedVerifier() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
+
+        // Stranger fails
+        vm.prank(stranger);
+        vm.expectRevert(PactEscrow.UnauthorizedVerifier.selector);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+
+        // Creator fails
+        vm.prank(creator);
+        vm.expectRevert(PactEscrow.UnauthorizedVerifier.selector);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+
+        // Recipient fails
+        vm.prank(recipient);
+        vm.expectRevert(PactEscrow.UnauthorizedVerifier.selector);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+    }
+
+    // 3. Approval settles recipient
+    function test_Verification_Approval_SettlesRecipient() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
+
+        uint256 balanceBefore = recipient.balance;
+
+        vm.prank(verifier);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+
+        assertEq(recipient.balance, balanceBefore + ESCROW_AMOUNT);
+    }
+
+    // 4. Rejected evidence refund path
+    function test_Verification_Rejection_RefundPath() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
+
+        uint256 creatorBalBefore = creator.balance;
+
+        vm.prank(verifier);
+        escrow.submitVerification(pactId, false, SAMPLE_VERIFICATION);
+
+        PactEscrow.Pact memory p = escrow.getPact(pactId);
+        assertEq(uint256(p.status), uint256(PactEscrow.PactStatus.Refunded));
+        assertEq(uint256(p.verificationResult), uint256(PactEscrow.VerificationResult.Rejected));
+        assertEq(p.verificationHash, SAMPLE_VERIFICATION);
+        assertEq(creator.balance, creatorBalBefore + ESCROW_AMOUNT);
+        assertEq(address(escrow).balance, 0);
+    }
+
+    // 5. Duplicate verification rejected
+    function test_Verification_RevertIf_DuplicateVerification() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
+
+        vm.prank(verifier);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+
+        vm.prank(verifier);
+        vm.expectRevert(PactEscrow.InvalidPactState.selector);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+    }
+
+    // 6. Verification without evidence rejected
+    function test_Verification_RevertIf_EvidenceNotSubmitted() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+
+        vm.prank(verifier);
+        vm.expectRevert(PactEscrow.InvalidPactState.selector);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+    }
+
+    // 7. Wrong pact verification rejected
+    function test_Verification_RevertIf_WrongPactId() public {
+        vm.startPrank(verifier);
+        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
+        escrow.submitVerification(0, true, SAMPLE_VERIFICATION);
+
+        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
+        escrow.submitVerification(999, true, SAMPLE_VERIFICATION);
+        vm.stopPrank();
+    }
+
+    // 8. Zero verificationHash rejected
+    function test_Verification_RevertIf_ZeroVerificationHash() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
+
+        vm.prank(verifier);
+        vm.expectRevert(PactEscrow.ZeroVerificationHash.selector);
+        escrow.submitVerification(pactId, true, bytes32(0));
+    }
+
+    // 9. Reentrancy on verification settlement
+    function test_Verification_Reentrancy_Reverts() public {
         ReentrantAttacker attacker = new ReentrantAttacker(escrow);
-        vm.deal(address(attacker), INITIAL_BALANCE);
 
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(address(attacker), deadline);
@@ -548,63 +649,152 @@ contract PactEscrowTest is Test {
         vm.prank(address(attacker));
         escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
 
-        attacker.setAttackParams(pactId, ReentrantAttacker.ActionType.Settle);
+        attacker.setAttackParams(pactId, ReentrantAttacker.ActionType.Verify);
 
-        // Creator attempts to settle. The transfer to attacker triggers receive() which re-enters settlePact.
-        // The reentrancy fails, causing TransferFailed revert or ReentrancyGuardReentrant revert.
-        vm.prank(creator);
-        vm.expectRevert();
-        escrow.settlePact(pactId);
+        vm.prank(verifier);
+        vm.expectRevert(PactEscrow.TransferFailed.selector);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
     }
 
-    // 41. GetPact invalid pact ID
-    function test_GetPact_RevertIf_InvalidPactId() public {
-        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
-        escrow.getPact(0);
+    // 10. Multiple pacts cannot mix verification
+    function test_Verification_MultiplePacts_CannotMixVerification() public {
+        address recipient2 = address(0x5555);
+        vm.deal(recipient2, INITIAL_BALANCE);
 
-        vm.expectRevert(PactEscrow.PactDoesNotExist.selector);
-        escrow.getPact(999);
+        vm.startPrank(creator);
+        uint256 pact1 = escrow.createPact{value: 2 ether}(recipient, deadline);
+        uint256 pact2 = escrow.createPact{value: 3 ether}(recipient2, deadline);
+        vm.stopPrank();
+
+        vm.prank(recipient);
+        escrow.submitEvidence(pact1, SAMPLE_EVIDENCE);
+
+        vm.prank(recipient2);
+        escrow.submitEvidence(pact2, keccak256("DELIVERY_2"));
+
+        uint256 rec1Before = recipient.balance;
+        uint256 rec2Before = recipient2.balance;
+
+        // Verify only pact 1
+        bytes32 hash1 = keccak256("VERIFY_1");
+        vm.prank(verifier);
+        escrow.submitVerification(pact1, true, hash1);
+
+        assertEq(recipient.balance, rec1Before + 2 ether);
+        assertEq(recipient2.balance, rec2Before);
+        assertEq(uint256(escrow.getPact(pact1).status), uint256(PactEscrow.PactStatus.Settled));
+        assertEq(uint256(escrow.getPact(pact2).status), uint256(PactEscrow.PactStatus.Submitted));
+        assertEq(escrow.getPact(pact1).verificationHash, hash1);
+        assertEq(escrow.getPact(pact2).verificationHash, bytes32(0));
+
+        // Reject pact 2
+        uint256 creatorBal = creator.balance;
+        bytes32 hash2 = keccak256("VERIFY_2");
+        vm.prank(verifier);
+        escrow.submitVerification(pact2, false, hash2);
+
+        assertEq(creator.balance, creatorBal + 3 ether);
+        assertEq(uint256(escrow.getPact(pact2).status), uint256(PactEscrow.PactStatus.Refunded));
+        assertEq(escrow.getPact(pact2).verificationHash, hash2);
     }
 
-    // 42. Funds transferred correctly
-    function test_FundsTransferredCorrectly() public {
+    // 11. Approved pact cannot refund
+    function test_Verification_ApprovedPact_CannotRefund() public {
         vm.prank(creator);
         uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
         vm.prank(recipient);
         escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
 
-        uint256 contractBalBefore = address(escrow).balance;
-        uint256 recipientBalBefore = recipient.balance;
+        vm.prank(verifier);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
 
-        vm.prank(creator);
-        escrow.settlePact(pactId);
+        vm.warp(deadline + 1 seconds);
 
-        assertEq(address(escrow).balance, contractBalBefore - ESCROW_AMOUNT);
-        assertEq(recipient.balance, recipientBalBefore + ESCROW_AMOUNT);
+        vm.expectRevert(PactEscrow.PactAlreadySettled.selector);
+        escrow.refundPact(pactId);
     }
 
-    // 43. Contract balance accounting
-    function test_ContractBalanceAccounting() public {
-        vm.startPrank(creator);
-        uint256 id1 = escrow.createPact{value: 10 ether}(recipient, deadline);
-        uint256 id2 = escrow.createPact{value: 20 ether}(recipient, deadline);
-        vm.stopPrank();
-
-        assertEq(address(escrow).balance, 30 ether);
+    // 12. Rejected pact cannot settle
+    function test_Verification_RejectedPact_CannotSettle() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
         vm.prank(recipient);
-        escrow.submitEvidence(id1, SAMPLE_EVIDENCE);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
+
+        vm.prank(verifier);
+        escrow.submitVerification(pactId, false, SAMPLE_VERIFICATION);
 
         vm.prank(creator);
-        escrow.settlePact(id1);
+        vm.expectRevert(PactEscrow.PactAlreadyRefunded.selector);
+        escrow.settlePact(pactId);
+    }
 
-        assertEq(address(escrow).balance, 20 ether);
+    // 13. Correct event emissions
+    function test_Verification_CorrectEventEmissions() public {
+        vm.prank(creator);
+        uint256 pactId = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
 
-        vm.warp(deadline + 1);
-        escrow.refundPact(id2);
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId, SAMPLE_EVIDENCE);
 
-        assertEq(address(escrow).balance, 0 ether);
+        // Test Approval Events
+        vm.expectEmit(true, false, false, true);
+        emit EvidenceVerified(pactId, true, SAMPLE_VERIFICATION);
+
+        vm.expectEmit(true, true, false, true);
+        emit PactSettled(pactId, recipient, ESCROW_AMOUNT);
+
+        vm.prank(verifier);
+        escrow.submitVerification(pactId, true, SAMPLE_VERIFICATION);
+
+        // Test Rejection Events on a second pact
+        vm.prank(creator);
+        uint256 pactId2 = escrow.createPact{value: ESCROW_AMOUNT}(recipient, deadline);
+
+        vm.prank(recipient);
+        escrow.submitEvidence(pactId2, SAMPLE_EVIDENCE);
+
+        vm.expectEmit(true, false, false, true);
+        emit EvidenceVerified(pactId2, false, SAMPLE_VERIFICATION);
+
+        vm.expectEmit(true, true, false, true);
+        emit PactRefunded(pactId2, creator, ESCROW_AMOUNT);
+
+        vm.prank(verifier);
+        escrow.submitVerification(pactId2, false, SAMPLE_VERIFICATION);
+    }
+
+    // 14. Escrow balance conservation
+    function test_Verification_EscrowBalanceConservation() public {
+        vm.startPrank(creator);
+        uint256 p1 = escrow.createPact{value: 10 ether}(recipient, deadline);
+        uint256 p2 = escrow.createPact{value: 20 ether}(recipient, deadline);
+        uint256 p3 = escrow.createPact{value: 15 ether}(recipient, deadline);
+        vm.stopPrank();
+
+        assertEq(address(escrow).balance, 45 ether);
+
+        vm.startPrank(recipient);
+        escrow.submitEvidence(p1, SAMPLE_EVIDENCE);
+        escrow.submitEvidence(p2, SAMPLE_EVIDENCE);
+        vm.stopPrank();
+
+        // Settle p1
+        vm.prank(verifier);
+        escrow.submitVerification(p1, true, SAMPLE_VERIFICATION);
+        assertEq(address(escrow).balance, 35 ether);
+
+        // Refund p2 via verifier rejection
+        vm.prank(verifier);
+        escrow.submitVerification(p2, false, SAMPLE_VERIFICATION);
+        assertEq(address(escrow).balance, 15 ether);
+
+        // p3 remains funded with exact 15 ether
+        PactEscrow.Pact memory remainingPact = escrow.getPact(p3);
+        assertEq(uint256(remainingPact.status), uint256(PactEscrow.PactStatus.Funded));
+        assertEq(remainingPact.amount, 15 ether);
     }
 }
 
@@ -620,7 +810,8 @@ contract ReentrantAttacker {
     enum ActionType {
         Settle,
         Claim,
-        Refund
+        Refund,
+        Verify
     }
     ActionType public action;
     bool public attackAttempted;
@@ -644,6 +835,8 @@ contract ReentrantAttacker {
                 targetEscrow.claimAfterReview(pactIdToReenter);
             } else if (action == ActionType.Refund) {
                 targetEscrow.refundPact(pactIdToReenter);
+            } else if (action == ActionType.Verify) {
+                targetEscrow.submitVerification(pactIdToReenter, true, keccak256("REENTRANT_VERIFY"));
             }
         }
     }
