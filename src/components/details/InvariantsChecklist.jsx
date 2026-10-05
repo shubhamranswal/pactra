@@ -5,6 +5,7 @@ export default function InvariantsChecklist({
   mode,
   onToggleInvariant,
   pact,
+  verificationResult,
   isDemo = false,
 }) {
   const invKeys = ["sender", "recipient", "token", "amount", "tx", "deadline"]
@@ -30,6 +31,24 @@ export default function InvariantsChecklist({
         {passedCount} of 6 satisfied
       </span>
     )
+  }
+
+  const getEvidenceSubText = () => {
+    if (verificationResult?.verdict === "APPROVED") return `AI Verified (${Math.round((verificationResult.confidence || 0) * 100)}% Confidence)`
+    if (verificationResult?.verdict === "REJECTED") return "AI Verification Failed"
+    if (verificationResult?.verdict === "NEEDS_REVIEW") return "Manual Review Required"
+    if (verificationResult?.verdict === "EVIDENCE_HASH_MISMATCH") return "Hash Mismatch Error"
+    if (pact?.hasEvidence) return "Evidence Hash Recorded"
+    if (pact) return "Pending Evidence"
+    return isDemo ? "zkProof / Hash Recorded" : "Pending Evidence"
+  }
+
+  const getEvidencePassText = () => {
+    if (verificationResult?.verdict === "APPROVED") return "✓ AI APPROVED"
+    if (verificationResult?.verdict === "REJECTED") return "✕ AI REJECTED"
+    if (verificationResult?.verdict === "NEEDS_REVIEW") return "⚠ NEEDS REVIEW"
+    if (verificationResult?.verdict === "EVIDENCE_HASH_MISMATCH") return "✕ HASH MISMATCH"
+    return pact?.hasEvidence ? "✓ EVIDENCE RECORDED" : "✓ PREDICATE VALID"
   }
 
   const items = [
@@ -60,17 +79,17 @@ export default function InvariantsChecklist({
     {
       key: "amount",
       num: "4. Amount",
-      title: "Deposit Exact",
+      title: "Deposit Allocation",
       sub: pact ? `${pact.amountFormatted} MON` : (isDemo ? "5.0000 MON" : "—"),
-      passText: "✓ EXACT MATCH",
+      passText: "✓ ON-CHAIN ESCROW CONFIRMED",
       failText: "✕ FAILED CHECK",
     },
     {
       key: "tx",
       num: "5. Evidence Proof",
       title: "Cryptographic Proof",
-      sub: pact?.hasEvidence ? "Evidence Hash On-Chain" : (pact ? "Pending Evidence" : (isDemo ? "zkProof / Hash Recorded" : "Pending")),
-      passText: pact?.hasEvidence ? "✓ EVIDENCE VERIFIED" : "✓ PREDICATE VALID",
+      sub: getEvidenceSubText(),
+      passText: getEvidencePassText(),
       failText: "✕ EVIDENCE MISSING",
     },
     {

@@ -8,6 +8,7 @@ import PaymentObligationCard from "../components/details/PaymentObligationCard"
 import BlockchainTxCard from "../components/details/BlockchainTxCard"
 import InvariantsChecklist from "../components/details/InvariantsChecklist"
 import DynamicOutcomeCard from "../components/details/DynamicOutcomeCard"
+import EvidenceVerificationCard from "../components/details/EvidenceVerificationCard"
 import TelemetryStrip from "../components/details/TelemetryStrip"
 import { usePact } from "../hooks/usePact"
 import { PACT_ESCROW_ADDRESS } from "../config/contracts"
@@ -20,6 +21,7 @@ export default function PactDetails() {
   const [forceDemoMode, setForceDemoMode] = useState(false)
   const [simulatedMode, setSimulatedMode] = useState(null)
   const [customInvariants, setCustomInvariants] = useState(null)
+  const [verificationResult, setVerificationResult] = useState(null)
 
   const {
     pact,
@@ -57,10 +59,18 @@ export default function PactDetails() {
 
   const isDemo = forceDemoMode || (!pact && !isLoading && (isNotFound || isInvalidId || isRpcError))
 
-  // Derive mode directly from real contract status
-  const derivedMode = pact
-    ? (pact.status === 2 ? "passed" : pact.status === 3 ? "expired" : "verifying")
-    : "verifying"
+  // Derive mode directly from real contract status and AI verification result
+  const derivedMode = useMemo(() => {
+    if (verificationResult?.verdict === "APPROVED") return "passed"
+    if (verificationResult?.verdict === "REJECTED" || verificationResult?.verdict === "EVIDENCE_HASH_MISMATCH") return "mismatch"
+    if (verificationResult?.verdict === "NEEDS_REVIEW") return "verifying"
+    if (pact) {
+      if (pact.status === 2) return "passed"
+      if (pact.status === 3) return "expired"
+      return "verifying"
+    }
+    return "verifying"
+  }, [verificationResult, pact])
 
   const mode = simulatedMode ?? derivedMode
 
@@ -106,14 +116,18 @@ export default function PactDetails() {
       }
     }
 
-    // Default: Truthful on-chain invariant state
+    // Default: Truthful on-chain & AI verifier invariant state
     if (pact) {
+      const isEvidenceValid = verificationResult
+        ? verificationResult.verdict === "APPROVED"
+        : Boolean(pact.hasEvidence)
+
       return {
         sender: true,
         recipient: true,
         token: true,
         amount: true,
-        tx: Boolean(pact.hasEvidence),
+        tx: isEvidenceValid,
         deadline: !pact.isExpired,
       }
     }
@@ -126,7 +140,7 @@ export default function PactDetails() {
       tx: false,
       deadline: true,
     }
-  }, [simulatedMode, pact])
+  }, [simulatedMode, pact, verificationResult])
 
   const invariants = customInvariants ?? defaultInvariants
 
@@ -324,7 +338,7 @@ export default function PactDetails() {
             {/* Lifecycle Timeline */}
             <LifecycleTimeline mode={mode} pact={pact} />
 
-            {/* Main Dual Grid: Payment & Blockchain Tx + Invariants & Dynamic Outcome */}
+            {/* Main Dual Grid: Payment & Blockchain Tx + Evidence Verification & Invariants */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Left Column (5 cols) */}
               <div className="lg:col-span-5 flex flex-col gap-6">
@@ -342,11 +356,19 @@ export default function PactDetails() {
 
               {/* Right Column (7 cols) */}
               <div className="lg:col-span-7 flex flex-col gap-6">
+                <EvidenceVerificationCard
+                  pact={pact}
+                  pactId={pact?.id || cleanId || id}
+                  onVerificationComplete={(res) => setVerificationResult(res)}
+                  isDemo={isDemo}
+                />
                 <InvariantsChecklist
                   invariants={invariants}
                   mode={mode}
                   onToggleInvariant={handleToggleInvariant}
                   pact={pact}
+                  verificationResult={verificationResult}
+                  isDemo={isDemo}
                 />
                 <DynamicOutcomeCard
                   mode={mode}
