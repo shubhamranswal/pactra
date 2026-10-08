@@ -8,6 +8,7 @@ import PaymentObligationCard from "../components/details/PaymentObligationCard"
 import BlockchainTxCard from "../components/details/BlockchainTxCard"
 import InvariantsChecklist from "../components/details/InvariantsChecklist"
 import DynamicOutcomeCard from "../components/details/DynamicOutcomeCard"
+import PaymentVerificationCard from "../components/details/PaymentVerificationCard"
 import TelemetryStrip from "../components/details/TelemetryStrip"
 import { usePact } from "../hooks/usePact"
 import { PACT_ESCROW_ADDRESS } from "../config/contracts"
@@ -20,6 +21,7 @@ export default function PactDetails() {
   const [forceDemoMode, setForceDemoMode] = useState(false)
   const [simulatedMode, setSimulatedMode] = useState(null)
   const [customInvariants, setCustomInvariants] = useState(null)
+  const [paymentVerificationResult, setPaymentVerificationResult] = useState(null)
 
   const {
     pact,
@@ -32,9 +34,12 @@ export default function PactDetails() {
     refetch,
   } = usePact(id)
 
-  // Derive transaction hash from navigation state or session storage cache
+  // Derive transaction hash from navigation state, session storage, or payment verification result
   const navTxHash = location.state?.transactionHash || null
   const transactionHash = useMemo(() => {
+    if (paymentVerificationResult?.txHash) {
+      return paymentVerificationResult.txHash
+    }
     if (navTxHash) {
       if (id) {
         try {
@@ -53,14 +58,22 @@ export default function PactDetails() {
       }
     }
     return null
-  }, [navTxHash, id])
+  }, [navTxHash, id, paymentVerificationResult])
 
   const isDemo = forceDemoMode || (!pact && !isLoading && (isNotFound || isInvalidId || isRpcError))
 
-  // Derive mode directly from real contract status
-  const derivedMode = pact
-    ? (pact.status === 2 ? "passed" : pact.status === 3 ? "expired" : "verifying")
-    : "verifying"
+  // Derive mode directly from real contract status and AI verification result
+  const derivedMode = useMemo(() => {
+    if (paymentVerificationResult?.gemini?.verdict === "APPROVED") return "passed"
+    if (paymentVerificationResult?.gemini?.verdict === "REJECTED") return "mismatch"
+    if (paymentVerificationResult?.gemini?.verdict === "NEEDS_REVIEW") return "verifying"
+    if (pact) {
+      if (pact.status === 2) return "passed"
+      if (pact.status === 3) return "expired"
+      return "verifying"
+    }
+    return "verifying"
+  }, [paymentVerificationResult, pact])
 
   const mode = simulatedMode ?? derivedMode
 
@@ -106,14 +119,30 @@ export default function PactDetails() {
       }
     }
 
-    // Default: Truthful on-chain invariant state
+    if (paymentVerificationResult?.deterministicResult) {
+      const det = paymentVerificationResult.deterministicResult
+      return {
+        sender: det.senderMatch,
+        recipient: det.recipientMatch,
+        token: det.tokenMatch,
+        amount: det.amountMatch,
+        tx: det.transactionSuccess,
+        deadline: det.deadlineMatch,
+      }
+    }
+
+    // Default: Truthful on-chain & AI verifier invariant state
     if (pact) {
+      const isEvidenceValid = paymentVerificationResult
+        ? paymentVerificationResult.gemini?.verdict === "APPROVED"
+        : Boolean(pact.hasEvidence)
+
       return {
         sender: true,
         recipient: true,
         token: true,
         amount: true,
-        tx: Boolean(pact.hasEvidence),
+        tx: isEvidenceValid,
         deadline: !pact.isExpired,
       }
     }
@@ -126,7 +155,7 @@ export default function PactDetails() {
       tx: false,
       deadline: true,
     }
-  }, [simulatedMode, pact])
+  }, [simulatedMode, pact, paymentVerificationResult])
 
   const invariants = customInvariants ?? defaultInvariants
 
@@ -134,6 +163,7 @@ export default function PactDetails() {
     setForceDemoMode(false)
     setSimulatedMode(null)
     setCustomInvariants(null)
+    setPaymentVerificationResult(null)
   }
 
   const handleSelectMode = (newMode) => {
@@ -302,7 +332,7 @@ export default function PactDetails() {
           </div>
         )}
 
-        {/* 5. SUCCESS / REAL DATA VIEW (or explicit Demo simulation view) */}
+        {/* 5. SUCCESS / REAL DATA VIEW */}
         {((pact && !isLoading) || forceDemoMode) && (
           <>
             {/* Header Section */}
@@ -324,7 +354,7 @@ export default function PactDetails() {
             {/* Lifecycle Timeline */}
             <LifecycleTimeline mode={mode} pact={pact} />
 
-            {/* Main Dual Grid: Payment & Blockchain Tx + Invariants & Dynamic Outcome */}
+            {/* Main Dual Grid: Payment & Blockchain Tx + Evidence & Payment Verification */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               {/* Left Column (5 cols) */}
               <div className="lg:col-span-5 flex flex-col gap-6">
@@ -342,11 +372,18 @@ export default function PactDetails() {
 
               {/* Right Column (7 cols) */}
               <div className="lg:col-span-7 flex flex-col gap-6">
+                <PaymentVerificationCard
+                  pact={pact}
+                  pactId={pact?.id || cleanId || id}
+                  onPaymentVerified={(res) => setPaymentVerificationResult(res)}
+                />
                 <InvariantsChecklist
                   invariants={invariants}
                   mode={mode}
                   onToggleInvariant={handleToggleInvariant}
                   pact={pact}
+                  paymentVerificationResult={paymentVerificationResult}
+                  isDemo={isDemo}
                 />
                 <DynamicOutcomeCard
                   mode={mode}

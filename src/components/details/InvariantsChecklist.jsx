@@ -5,13 +5,28 @@ export default function InvariantsChecklist({
   mode,
   onToggleInvariant,
   pact,
+  verificationResult,
+  paymentVerificationResult,
   isDemo = false,
 }) {
   const invKeys = ["sender", "recipient", "token", "amount", "tx", "deadline"]
-  const passedCount = invKeys.filter((k) => invariants[k]).length
+
+  const det = paymentVerificationResult?.deterministicResult
+
+  // Derive individual check statuses if payment verification result is present
+  const effectiveInvariants = {
+    sender: det ? det.senderMatch : invariants.sender,
+    recipient: det ? det.recipientMatch : invariants.recipient,
+    token: det ? det.tokenMatch : invariants.token,
+    amount: det ? det.amountMatch : invariants.amount,
+    tx: det ? det.transactionSuccess : (verificationResult?.verdict === "APPROVED" || invariants.tx),
+    deadline: det ? det.deadlineMatch : invariants.deadline,
+  }
+
+  const passedCount = invKeys.filter((k) => effectiveInvariants[k]).length
 
   const getStatusBadge = () => {
-    if (mode === "verifying") {
+    if (mode === "verifying" && !det) {
       return (
         <span className="ml-2 px-2 py-0.5 rounded-full bg-primary/20 border border-primary/40 text-primary font-mono text-[11px] font-semibold">
           {passedCount} of 6 evaluated
@@ -36,16 +51,18 @@ export default function InvariantsChecklist({
     {
       key: "sender",
       num: "1. Sender",
-      title: "Originator Auth",
-      sub: pact?.creator ? shortenAddress(pact.creator) : (isDemo ? "0x4a9...e21" : "—"),
-      passText: "✓ AUTH VALIDATED",
-      failText: "✕ FAILED CHECK",
+      title: "Payer Address",
+      exp: pact?.creator ? shortenAddress(pact.creator) : (isDemo ? "0x4a9...e21" : "—"),
+      act: det ? shortenAddress(det.actual.sender) : null,
+      passText: "✓ SENDER MATCH",
+      failText: "✕ SENDER MISMATCH",
     },
     {
       key: "recipient",
       num: "2. Recipient",
       title: "Target Recipient",
-      sub: pact?.recipient ? shortenAddress(pact.recipient) : (isDemo ? "0x709...79C8" : "—"),
+      exp: pact?.recipient ? shortenAddress(pact.recipient) : (isDemo ? "0x709...79C8" : "—"),
+      act: det ? shortenAddress(det.actual.recipient) : null,
       passText: "✓ RECIPIENT MATCH",
       failText: "✕ RECIPIENT MISMATCH",
     },
@@ -53,31 +70,35 @@ export default function InvariantsChecklist({
       key: "token",
       num: "3. Token",
       title: "Native Escrow",
-      sub: "MON (Native Escrow)",
+      exp: "Native MON",
+      act: det ? det.actual.token : null,
       passText: "✓ NATIVE MON LOCK",
-      failText: "✕ FAILED CHECK",
+      failText: "✕ TOKEN MISMATCH",
     },
     {
       key: "amount",
       num: "4. Amount",
-      title: "Deposit Exact",
-      sub: pact ? `${pact.amountFormatted} MON` : (isDemo ? "5.0000 MON" : "—"),
-      passText: "✓ EXACT MATCH",
-      failText: "✕ FAILED CHECK",
+      title: "Deposit Allocation",
+      exp: pact ? `${pact.amountFormatted} MON` : (isDemo ? "5.0000 MON" : "—"),
+      act: det ? `${det.actual.amountMON} MON` : null,
+      passText: "✓ ON-CHAIN ESCROW CONFIRMED",
+      failText: "✕ AMOUNT MISMATCH",
     },
     {
       key: "tx",
-      num: "5. Evidence Proof",
-      title: "Cryptographic Proof",
-      sub: pact?.hasEvidence ? "Evidence Hash On-Chain" : (pact ? "Pending Evidence" : (isDemo ? "zkProof / Hash Recorded" : "Pending")),
-      passText: pact?.hasEvidence ? "✓ EVIDENCE VERIFIED" : "✓ PREDICATE VALID",
-      failText: "✕ EVIDENCE MISSING",
+      num: "5. Payment Proof",
+      title: "Transaction Success",
+      exp: "Success Receipt",
+      act: det ? det.actual.status : (pact?.hasEvidence ? "Evidence Hash" : null),
+      passText: "✓ TX CONFIRMED",
+      failText: "✕ TX FAILED / UNCONFIRMED",
     },
     {
       key: "deadline",
       num: "6. Deadline",
       title: "Timelock Window",
-      sub: pact ? (pact.isExpired ? "Expired" : "Active Timelock") : (isDemo ? "< 18:00 UTC" : "—"),
+      exp: pact ? (pact.isExpired ? "Expired" : "< Deadline") : (isDemo ? "< 18:00 UTC" : "—"),
+      act: det ? (det.deadlineMatch ? "Within Deadline" : "After Deadline") : null,
       passText: "✓ WITHIN TIMELOCK",
       failText: "✕ TIMELOCK EXPIRED",
     },
@@ -92,14 +113,14 @@ export default function InvariantsChecklist({
           {getStatusBadge()}
         </div>
         <span className="font-mono text-[11px] text-outline">
-          Interactive simulation toggles
+          Expected vs Actual Blockchain Truth
         </span>
       </div>
 
       {/* 6 Invariants Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         {items.map((item) => {
-          const isOk = invariants[item.key]
+          const isOk = effectiveInvariants[item.key]
           return (
             <div
               key={item.key}
@@ -126,8 +147,13 @@ export default function InvariantsChecklist({
                   {item.title}
                 </div>
                 <div className="font-mono text-[11px] text-on-surface-variant truncate">
-                  {item.sub}
+                  <span className="text-outline">Exp:</span> {item.exp}
                 </div>
+                {item.act && (
+                  <div className={`font-mono text-[10px] truncate ${isOk ? "text-emerald-400" : "text-rose-400"}`}>
+                    <span className="text-outline">Act:</span> {item.act}
+                  </div>
+                )}
               </div>
 
               <div
