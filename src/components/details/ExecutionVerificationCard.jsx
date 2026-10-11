@@ -3,6 +3,10 @@ import { shortenAddress } from "../../utils/address"
 import { SETTLEMENT_STATES } from "../../hooks/useEvidenceAndSettlement"
 import { compileEvidencePackage } from "../../lib/veridict/manifest"
 import { CRITERION_TYPES } from "../../lib/veridict/schema"
+import { hashCanonical } from "../../lib/veridict/canonical"
+
+const VALID_OUTPUT_PAYLOAD = { status: "verified_execution", completedAt: 1791112500 }
+const VALID_PAYLOAD_HASH = hashCanonical(VALID_OUTPUT_PAYLOAD)
 
 export default function ExecutionVerificationCard({
   pact,
@@ -62,7 +66,7 @@ export default function ExecutionVerificationCard({
           criterionId: 2,
           type: CRITERION_TYPES.TYPE_C,
           description: "Cryptographic Artifact: Output payload hash match",
-          expectedHash: "0x7f83b1657ff1fc53b92dc18148a1d65dfc2d4b1fa3d677284addd200126d9069",
+          expectedHash: VALID_PAYLOAD_HASH,
         },
       ],
     }
@@ -111,7 +115,7 @@ export default function ExecutionVerificationCard({
         {
           criterionId: 2,
           type: CRITERION_TYPES.TYPE_C,
-          outputPayload: { status: "verified_execution", completedAt: 1791112500 },
+          outputPayload: VALID_OUTPUT_PAYLOAD,
         },
       ],
     })
