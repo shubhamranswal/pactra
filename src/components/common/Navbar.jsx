@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom"
 import { ConnectButton } from "@rainbow-me/rainbowkit"
 import PactraLogo from "./PactraLogo"
 import { shortenAddress } from "../../utils/address"
+import DeployContractModal from "./DeployContractModal"
 
 export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -72,6 +73,9 @@ export default function Navbar() {
               Monad Testnet
             </span>
           </div>
+
+          {/* Escrow Contract Settings / 1-Click Deploy */}
+          <DeployContractModal />
 
           {/* Connected Address Chip / Wallet Connect Button */}
           <ConnectButton.Custom>

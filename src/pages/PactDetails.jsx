@@ -10,6 +10,9 @@ import InvariantsChecklist from "../components/details/InvariantsChecklist"
 import DynamicOutcomeCard from "../components/details/DynamicOutcomeCard"
 import TelemetryStrip from "../components/details/TelemetryStrip"
 import { usePact } from "../hooks/usePact"
+import { useWallet } from "../hooks/useWallet"
+import { useEvidenceAndSettlement, SETTLEMENT_STATES } from "../hooks/useEvidenceAndSettlement"
+import ExecutionVerificationCard from "../components/details/ExecutionVerificationCard"
 import { PACT_ESCROW_ADDRESS } from "../config/contracts"
 import { shortenAddress } from "../utils/address"
 
@@ -20,6 +23,8 @@ export default function PactDetails() {
   const [forceDemoMode, setForceDemoMode] = useState(false)
   const [simulatedMode, setSimulatedMode] = useState(null)
   const [customInvariants, setCustomInvariants] = useState(null)
+
+  const { address, isConnected, isCorrectNetwork } = useWallet()
 
   const {
     pact,
@@ -32,8 +37,15 @@ export default function PactDetails() {
     refetch,
   } = usePact(id)
 
-  // Derive transaction hash from navigation state or session storage cache
-  const navTxHash = location.state?.transactionHash || null
+  const evidenceState = useEvidenceAndSettlement({
+    pact,
+    onSuccess: () => {
+      refetch()
+    },
+  })
+
+  // Derive transaction hash from settlement, navigation state, or session storage cache
+  const navTxHash = evidenceState.settlementTxHash || location.state?.transactionHash || null
   const transactionHash = useMemo(() => {
     if (navTxHash) {
       if (id) {
@@ -57,9 +69,12 @@ export default function PactDetails() {
 
   const isDemo = forceDemoMode || (!pact && !isLoading && (isNotFound || isInvalidId || isRpcError))
 
-  // Derive mode directly from real contract status
-  const derivedMode = pact
-    ? (pact.status === 2 ? "passed" : pact.status === 3 ? "expired" : "verifying")
+  // Derive mode directly from real contract status or live settlement state
+  const isSettledLive = pact?.status === 2 || evidenceState.isComplete || evidenceState.state === SETTLEMENT_STATES.SETTLED
+  const derivedMode = isSettledLive
+    ? "passed"
+    : pact?.status === 3
+    ? "expired"
     : "verifying"
 
   const mode = simulatedMode ?? derivedMode
@@ -342,6 +357,15 @@ export default function PactDetails() {
 
               {/* Right Column (7 cols) */}
               <div className="lg:col-span-7 flex flex-col gap-6">
+                <ExecutionVerificationCard
+                  pact={pact}
+                  pactId={pact?.id || cleanId || id}
+                  userAddress={address}
+                  isConnected={isConnected}
+                  isCorrectNetwork={isCorrectNetwork}
+                  evidenceState={evidenceState}
+                  onRefetchPact={refetch}
+                />
                 <InvariantsChecklist
                   invariants={invariants}
                   mode={mode}

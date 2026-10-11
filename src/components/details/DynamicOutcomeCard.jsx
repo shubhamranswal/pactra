@@ -102,8 +102,18 @@ export default function DynamicOutcomeCard({ mode, invariants, pact, isDemo = fa
           <div className="p-4 rounded-xl bg-surface-container/90 border border-success/30 flex flex-col gap-3">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs text-outline">Escrow Settlement Disbursement</span>
-              <span className="font-mono text-[10px] text-success font-semibold px-2 py-0.5 rounded bg-success/15 border border-success/30">
-                DISBURSED
+              <span className={`font-mono text-[10px] font-semibold px-2 py-0.5 rounded border ${
+                pact?.status === 2
+                  ? "text-success bg-success/15 border-success/30"
+                  : pact?.status === 0
+                  ? "text-amber-300 bg-amber-500/15 border-amber-500/30"
+                  : "text-success bg-success/15 border-success/30"
+              }`}>
+                {pact?.status === 2
+                  ? "DISBURSED ON-CHAIN"
+                  : pact?.status === 0
+                  ? "FUNDED (SIMULATED PREVIEW)"
+                  : "DISBURSED"}
               </span>
             </div>
             <div className="flex items-center justify-between py-1">
@@ -124,13 +134,25 @@ export default function DynamicOutcomeCard({ mode, invariants, pact, isDemo = fa
           </div>
 
           <p className="font-sans text-xs text-on-surface-variant leading-relaxed">
-            Deterministic state finalized. Invariants confirmed and escrow funds released to the recipient on Monad Testnet.
+            {pact?.status === 2
+              ? "Deterministic state finalized. Invariants confirmed and escrow funds released to the recipient on Monad Testnet."
+              : pact?.status === 0
+              ? "Previewing settled outcome. Click 'Submit Evidence & Release Payment to Recipient' above to execute this transfer on-chain."
+              : "Deterministic state finalized. Invariants confirmed and escrow funds released to the recipient on Monad Testnet."}
           </p>
 
           <div className="flex items-center justify-between pt-3 border-t border-outline-variant/30 flex-wrap gap-2">
-            <span className="font-mono text-xs text-outline">State: Pact Settled</span>
-            <span className="px-3 py-1 rounded-lg bg-success/15 border border-success/30 text-success font-mono text-xs font-semibold">
-              Finalized
+            <span className="font-mono text-xs text-outline">
+              State: {pact?.status === 2 ? "Pact Settled" : (pact?.status === 0 ? "Pact Funded (Preview)" : "Pact Settled")}
+            </span>
+            <span className={`px-3 py-1 rounded-lg border font-mono text-xs font-semibold ${
+              pact?.status === 2
+                ? "bg-success/15 border-success/30 text-success"
+                : pact?.status === 0
+                ? "bg-amber-500/15 border-amber-500/30 text-amber-300"
+                : "bg-success/15 border-success/30 text-success"
+            }`}>
+              {pact?.status === 2 ? "Finalized" : (pact?.status === 0 ? "Pending Evidence" : "Finalized")}
             </span>
           </div>
         </div>

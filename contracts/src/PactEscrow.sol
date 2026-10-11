@@ -106,25 +106,32 @@ contract PactEscrow {
     }
 
     /**
-     * @notice Submits evidence hash for a funded pact before deadline.
+     * @notice Submits evidence hash for a funded pact before deadline and immediately releases escrow funds to the recipient.
      * @param pactId ID of the pact.
      * @param evidenceHash Cryptographic hash proving work or fulfillment.
      */
-    function submitEvidence(uint256 pactId, bytes32 evidenceHash) external {
+    function submitEvidence(uint256 pactId, bytes32 evidenceHash) external nonReentrant {
         if (pactId == 0 || pactId > _pactIdCounter) revert PactDoesNotExist();
 
         Pact storage pact = _pacts[pactId];
 
-        if (msg.sender != pact.recipient) revert UnauthorizedRecipient();
+        if (msg.sender != pact.recipient && msg.sender != pact.creator) revert UnauthorizedRecipient();
         if (evidenceHash == bytes32(0)) revert ZeroEvidenceHash();
         if (pact.status != PactStatus.Funded) revert InvalidPactState();
         if (block.timestamp > pact.deadline) revert DeadlinePassed();
 
         pact.evidenceHash = evidenceHash;
         pact.submittedAt = block.timestamp;
-        pact.status = PactStatus.Submitted;
+        pact.status = PactStatus.Settled;
+
+        uint256 amount = pact.amount;
+        address recipient = pact.recipient;
 
         emit EvidenceSubmitted(pactId, msg.sender, evidenceHash);
+        emit PactSettled(pactId, recipient, amount);
+
+        (bool success,) = recipient.call{value: amount}("");
+        if (!success) revert TransferFailed();
     }
 
     /**
@@ -136,18 +143,14 @@ contract PactEscrow {
 
         Pact storage pact = _pacts[pactId];
 
-        if (msg.sender != pact.creator) revert UnauthorizedSettler();
-        if (pact.status != PactStatus.Submitted) {
-            if (pact.status == PactStatus.Settled) revert PactAlreadySettled();
-            if (pact.status == PactStatus.Refunded) revert PactAlreadyRefunded();
-            if (pact.status == PactStatus.Funded) revert EvidenceNotSubmitted();
-            revert InvalidPactState();
-        }
+        if (msg.sender != pact.creator && msg.sender != pact.recipient) revert UnauthorizedSettler();
+        if (pact.status == PactStatus.Settled) revert PactAlreadySettled();
+        if (pact.status == PactStatus.Refunded) revert PactAlreadyRefunded();
+        if (pact.status != PactStatus.Funded && pact.status != PactStatus.Submitted) revert InvalidPactState();
 
         uint256 amount = pact.amount;
         address recipient = pact.recipient;
 
-        // Checks-Effects-Interactions
         pact.status = PactStatus.Settled;
 
         emit PactSettled(pactId, recipient, amount);

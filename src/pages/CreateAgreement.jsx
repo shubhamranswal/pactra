@@ -41,7 +41,7 @@ function getTimeoutDurationInSeconds(timeoutStr) {
 export default function CreateAgreement() {
   const [selectedArchitecture, setSelectedArchitecture] = useState("MON")
   const [providerAgent, setProviderAgent] = useState("PaymentAgent-B")
-  const [recipientAddress, setRecipientAddress] = useState("0x70997970C51812dc3A010C7d01b50e0d17dc79C8")
+  const [recipientAddress, setRecipientAddress] = useState("")
   const [token, setToken] = useState("MON")
   const [amount, setAmount] = useState("0.1")
   const [timeout, setTimeoutHours] = useState("24 Hours")
