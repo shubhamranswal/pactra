@@ -166,8 +166,8 @@ export default function ExecutionVerificationCard({
   const explorerTxUrl = settlementTxHash
     ? `https://testnet.monadexplorer.com/tx/${settlementTxHash}`
     : evidenceTxHash
-    ? `https://testnet.monadexplorer.com/tx/${evidenceTxHash}`
-    : null
+      ? `https://testnet.monadexplorer.com/tx/${evidenceTxHash}`
+      : null
 
   return (
     <div className="rounded-2xl bg-surface-low border border-outline-variant/40 p-6 sm:p-7 shadow-xl flex flex-col gap-6 text-left relative overflow-hidden">
@@ -235,8 +235,8 @@ export default function ExecutionVerificationCard({
               (isVerifying
                 ? "Verifying your evidence..."
                 : isSubmittingEvidence
-                ? "Confirming evidence on-chain..."
-                : "Releasing payment...")}
+                  ? "Confirming evidence on-chain..."
+                  : "Releasing payment...")}
           </div>
         </div>
       )}
@@ -401,7 +401,7 @@ export default function ExecutionVerificationCard({
               className="w-full py-3.5 px-6 rounded-xl font-display text-sm font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg bg-emerald-500 hover:bg-emerald-400 text-black shadow-[0_0_24px_-4px_rgba(16,185,129,0.4)]"
             >
               <span className="material-symbols-outlined text-[18px]">verified</span>
-              <span>Submit Evidence &amp; Release Payment to Recipient</span>
+              <span>Provide confirmation to  release payment to recipient</span>
             </button>
           )}
         </div>
@@ -473,22 +473,20 @@ export default function ExecutionVerificationCard({
                   <button
                     type="button"
                     onClick={() => setTestScenario("pass")}
-                    className={`px-2 py-0.5 rounded text-[10px] transition-colors cursor-pointer ${
-                      testScenario === "pass"
-                        ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                        : "text-outline hover:text-white"
-                    }`}
+                    className={`px-2 py-0.5 rounded text-[10px] transition-colors cursor-pointer ${testScenario === "pass"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      : "text-outline hover:text-white"
+                      }`}
                   >
                     Valid Proof
                   </button>
                   <button
                     type="button"
                     onClick={() => setTestScenario("fail")}
-                    className={`px-2 py-0.5 rounded text-[10px] transition-colors cursor-pointer ${
-                      testScenario === "fail"
-                        ? "bg-danger/20 text-danger border border-danger/40"
-                        : "text-outline hover:text-white"
-                    }`}
+                    className={`px-2 py-0.5 rounded text-[10px] transition-colors cursor-pointer ${testScenario === "fail"
+                      ? "bg-danger/20 text-danger border border-danger/40"
+                      : "text-outline hover:text-white"
+                      }`}
                   >
                     Failing Proof
                   </button>

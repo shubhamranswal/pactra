@@ -68,7 +68,7 @@ export default function InvariantsChecklist({
     {
       key: "tx",
       num: "5. Evidence Proof",
-      title: "Cryptographic Proof",
+      title: "Confirm Manual Verification",
       sub: pact?.hasEvidence ? "Evidence Hash On-Chain" : (pact ? "Pending Evidence" : (isDemo ? "zkProof / Hash Recorded" : "Pending")),
       passText: pact?.hasEvidence ? "✓ EVIDENCE VERIFIED" : "✓ PREDICATE VALID",
       failText: "✕ EVIDENCE MISSING",
@@ -104,20 +104,18 @@ export default function InvariantsChecklist({
             <div
               key={item.key}
               onClick={() => onToggleInvariant(item.key)}
-              className={`p-3 rounded-lg transition-all cursor-pointer flex flex-col justify-between gap-2 select-none group border ${
-                isOk
-                  ? "bg-surface-container/70 border-outline-variant/40 hover:border-primary/50"
-                  : "bg-danger/10 border-danger/60"
-              }`}
+              className={`p-3 rounded-lg transition-all cursor-pointer flex flex-col justify-between gap-2 select-none group border ${isOk
+                ? "bg-surface-container/70 border-outline-variant/40 hover:border-primary/50"
+                : "bg-danger/10 border-danger/60"
+                }`}
             >
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] uppercase text-outline group-hover:text-primary transition-colors">
                   {item.num}
                 </span>
                 <span
-                  className={`w-2 h-2 rounded-full ${
-                    isOk ? "bg-success shadow-[0_0_6px_#10b981]" : "bg-danger shadow-[0_0_6px_#ef4444]"
-                  }`}
+                  className={`w-2 h-2 rounded-full ${isOk ? "bg-success shadow-[0_0_6px_#10b981]" : "bg-danger shadow-[0_0_6px_#ef4444]"
+                    }`}
                 ></span>
               </div>
 
@@ -131,9 +129,8 @@ export default function InvariantsChecklist({
               </div>
 
               <div
-                className={`font-mono text-[10px] font-semibold tracking-wider pt-1 border-t border-outline-variant/30 ${
-                  isOk ? "text-success" : "text-danger"
-                }`}
+                className={`font-mono text-[10px] font-semibold tracking-wider pt-1 border-t border-outline-variant/30 ${isOk ? "text-success" : "text-danger"
+                  }`}
               >
                 {isOk ? item.passText : item.failText}
               </div>
