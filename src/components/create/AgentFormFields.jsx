@@ -124,7 +124,7 @@ export default function AgentFormFields({
                 className="w-full bg-[#0D0E11]/90 border border-white/10 hover:border-white/20 rounded-xl px-3 py-2.5 font-mono text-xs font-semibold text-white focus:border-[#7C3AED] focus:outline-none appearance-none cursor-pointer pr-7"
               >
                 <option value="MON">MON (Native)</option>
-                <option value="USDC">USDC (Stable)</option>
+                <option value="USDC" disabled>USDC (Disabled)</option>
               </select>
               <span className="material-symbols-outlined absolute right-2 top-1/2 -translate-y-1/2 text-[16px] text-[#64748B] pointer-events-none">
                 expand_more

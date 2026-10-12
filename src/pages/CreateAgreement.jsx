@@ -67,6 +67,7 @@ export default function CreateAgreement() {
   const isSuccessModalOpen = isSuccess && !modalDismissed
 
   const handleSelectArchitecture = (archId) => {
+    if (archId !== "MON") return
     setSelectedArchitecture(archId)
     setToken("MON")
   }
