@@ -74,8 +74,8 @@ export default function Navbar() {
             </span>
           </div>
 
-          {/* Escrow Contract Settings / 1-Click Deploy */}
-          <DeployContractModal />
+          {/* Escrow Contract Settings / 1-Click Deploy (hidden for demo) */}
+          {/* <DeployContractModal /> */}
 
           {/* Connected Address Chip / Wallet Connect Button */}
           <ConnectButton.Custom>
