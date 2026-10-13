@@ -1,6 +1,14 @@
-# Pactra
+`<div align="center">`
 
-> **Commit. Prove. Resolve.**
+`  <img src="public/pactra-icon.png" alt="Pactra Logo" width="160" />`
+
+`  <h1>Pactra</h1>`
+
+`  <p><strong>Commit. Prove. Resolve.</strong></p>`
+
+`  <p>Built on Monad. Powered by veridict.</p>`
+
+`</div>`
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Network: Monad Testnet](https://img.shields.io/badge/Network-Monad%20Testnet%20(10143)-8338EC.svg)](https://testnet.monadexplorer.com/address/0x3d22Dc20a9Ff29Fd4EbbCD5B380e8d641eA577ce)
