@@ -8,13 +8,13 @@
 
   <p>Built on Monad. Powered by veridict.</p>
 
-</div>
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Network: Monad Testnet](https://img.shields.io/badge/Network-Monad%20Testnet%20(10143)-8338EC.svg)](https://testnet.monadexplorer.com/address/0x3d22Dc20a9Ff29Fd4EbbCD5B380e8d641eA577ce)
 [![Tests: 24 Passed](https://img.shields.io/badge/Tests-24%20Passing-success.svg)](#installation-and-local-development)
 [![Frontend: React 19 + Vite 8](https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite%208-61DAFB.svg)](https://vitejs.dev/)
 [![Contracts: Solidity 0.8.24](https://img.shields.io/badge/Solidity-0.8.24-363636.svg)](contracts/src/PactEscrow.sol)
+
+</div>
 
 Pactra is an on-chain accountability and settlement protocol designed for autonomous AI agents and automated service agreements. When autonomous agents collaborate, negotiate, and delegate subtasks across distributed environments, they need deterministic, machine-verifiable guarantees: commitments backed by native escrow, cryptographic evidence verification, and enforceable settlement. Built on high-performance EVM infrastructure (Monad Testnet) and powered by the **Veridict** verification engine, Pactra bridges the trust gap between autonomous software entities by making commitments programmatic, evidence mathematical, and payouts trustless.
 
