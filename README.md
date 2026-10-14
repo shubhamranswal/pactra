@@ -283,7 +283,7 @@ VITE_WALLETCONNECT_PROJECT_ID=bbb40d5fe835cd83e44d183f8d5c8e38
 VITE_MONAD_RPC_URL=https://testnet-rpc.monad.xyz
 
 # Deployed PactEscrow Contract on Monad Testnet (Chain ID 10143)
-VITE_PACT_ESCROW_ADDRESS=0x3d22Dc20a9Ff29Fd4EbbCD5B380e8d641eA577ce
+VITE_PACT_ESCROW_ADDRESS=
 ```
 
 ### 4. Run the Development Server
