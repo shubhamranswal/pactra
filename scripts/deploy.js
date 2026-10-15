@@ -58,7 +58,7 @@ async function main() {
   console.log("🎉 PactEscrow successfully deployed at:", contractAddress)
 
   // Update .env
-  let envContent = ""
+  let envContent
   try {
     envContent = fs.readFileSync(".env", "utf8")
   } catch {
