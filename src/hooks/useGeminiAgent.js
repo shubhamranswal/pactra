@@ -54,10 +54,19 @@ export function useGeminiAgent() {
         }),
       })
 
-      const data = await response.json()
+      const rawText = await response.text()
+      let data = null
+      try {
+        data = rawText ? JSON.parse(rawText) : null
+      } catch {
+        // Failed to parse JSON response
+      }
 
-      if (!response.ok || !data.success) {
-        const errMsg = data.message || data.error || `HTTP ${response.status} execution failed`
+      if (!response.ok || !data?.success) {
+        const errMsg =
+          data?.message ||
+          data?.error ||
+          (response.status ? `Server error (HTTP ${response.status}): ${rawText.slice(0, 150)}` : "Agent execution failed")
         const execErr = new Error(errMsg)
         setError(execErr)
         setState(AGENT_EXECUTION_STATES.ERROR)
