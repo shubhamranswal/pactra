@@ -10,7 +10,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Network: Monad Testnet](https://img.shields.io/badge/Network-Monad%20Testnet%20(10143)-8338EC.svg)](https://testnet.monadexplorer.com/address/0x3d22Dc20a9Ff29Fd4EbbCD5B380e8d641eA577ce)
-[![Tests: 24 Passed](https://img.shields.io/badge/Tests-24%20Passing-success.svg)](#installation-and-local-development)
+[![Tests: 33 Passed](https://img.shields.io/badge/Tests-33%20Passing-success.svg)](#installation-and-local-development)
 [![Frontend: React 19 + Vite 8](https://img.shields.io/badge/Frontend-React%2019%20%7C%20Vite%208-61DAFB.svg)](https://vitejs.dev/)
 [![Contracts: Solidity 0.8.24](https://img.shields.io/badge/Solidity-0.8.24-363636.svg)](contracts/src/PactEscrow.sol)
 
@@ -31,6 +31,7 @@ Pactra is an on-chain accountability and settlement protocol designed for autono
 - [Architecture and Technology Stack](#architecture-and-technology-stack)
   - [System Architecture](#system-architecture)
   - [Technology Matrix](#technology-matrix)
+- [Gemini Autonomous Agent (Option A)](#gemini-autonomous-agent-option-a)
 - [Veridict Verification Engine](#veridict-verification-engine)
 - [Prerequisites](#prerequisites)
 - [Installation and Local Development](#installation-and-local-development)
@@ -221,8 +222,82 @@ flowchart TB
 | **Query State** | TanStack React Query | `^5.104.1` | Asynchronous cache and block-sync state |
 | **Smart Contract**| Solidity | `^0.8.24` | Native escrow smart contract (`PactEscrow.sol`) |
 | **Contract Tooling**| Foundry & solc | Foundry / `solc 0.8.24` | Smart contract compilation, testing, and deployment |
+| **AI Agent SDK** | Google Gen AI SDK | `@google/genai` | Autonomous multi-turn function calling with `gemini-3.5-flash-lite` |
+| **Agent Server** | Express + CORS | `^4.21.2` | Sandboxed tool execution, telemetry capture, and manifest bridge |
 | **Verification** | Veridict Engine | Custom JS (`RFC 8785`) | Deterministic multi-type evidence validation |
-| **Test Runner** | Node Test Runner | Node.js native (`--test`) | 24 automated unit and orchestration test suites |
+| **Test Runner** | Node Test Runner | Node.js native (`--test`) | 33 automated unit, tool sandbox, and orchestration test suites |
+
+---
+
+## Gemini Autonomous Agent (Option A)
+
+Pactra features **Option A: Autonomous Gemini Agent**, allowing real LLM agents to plan, execute service tasks using deterministic tools, collect verifiable telemetry, compile canonical evidence manifests, and disburse escrow funds under strict recipient-controlled approval:
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                   PACTRA OPTION A ARCHITECTURE                         │
+└────────────────────────────────────────────────────────────────────────┘
+  1. USER / RECIPIENT                    2. BACKEND RUNNER (/api/agent)
+  ┌───────────────────────┐              ┌───────────────────────────┐
+  │ "Run Gemini Agent"    ├─────────────►│ Reads On-Chain Pact State │
+  │ in UI                 │   Trigger    │ (Recipient, Deadline, ID) │
+  └───────────────────────┘              └─────────────┬─────────────┘
+                                                       │
+                                                       ▼
+                                         ┌───────────────────────────┐
+                                         │ Gemini 3.5 Flash Lite     │
+                                         │ Autonomous Reasoner       │
+                                         └─────────────┬─────────────┘
+                                                       │
+                     ┌─────────────────────────────────┴─────────────────────────────────┐
+                     ▼                                 ▼                                 ▼
+         ┌───────────────────────┐         ┌───────────────────────┐         ┌───────────────────────┐
+         │   tool_api_caller     │         │ tool_blockchain_query │         │  tool_crypto_hasher   │
+         │ (SSRF-protected HTTP) │         │ (Monad Testnet State) │         │ (Canonical Keccak256) │
+         └───────────┬───────────┘         └───────────┬───────────┘         └───────────┬───────────┘
+                     └─────────────────────────────────┼─────────────────────────────────┘
+                                                       ▼
+                                         ┌───────────────────────────┐
+                                         │ ExecutionRecorder         │
+                                         │ Captures Raw Telemetry    │
+                                         └─────────────┬─────────────┘
+                                                       │
+                                                       ▼
+                                         ┌───────────────────────────┐
+                                         │ Manifest Compiler Bridge  │
+                                         │ - RFC 8785 Canonical JSON │
+                                         │ - Keccak-256 evidenceHash │
+                                         └─────────────┬─────────────┘
+                                                       │
+  3. VERIDICT GATE & RECIPIENT APPROVAL                ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ Client-Side Veridict Engine evaluates EvidencePackage:           │
+  │ • Validates API call counts (TYPE_A)                             │
+  │ • Validates deliverable hash match (TYPE_C)                      │
+  │ • Computes verdict: PASS / FAIL                                  │
+  └────────────────────────────────┬─────────────────────────────────┘
+                                   │
+                                   ▼
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ Recipient-Only MetaMask Approval Gate:                           │
+  │ • Check: connected wallet === pact.recipient                     │
+  │ • Check: network === Monad Testnet (10143)                       │
+  │ • Check: pact is funded & unexpired                              │
+  │                                                                  │
+  │ Recipient signs: `submitEvidence(pactId, evidenceHash)`          │
+  │ -> Monad Testnet releases escrowed MON directly to Recipient     │
+  └──────────────────────────────────────────────────────────────────┘
+```
+
+### Approved Agent Tool Capabilities
+- **`tool_api_caller`**: Executes verified HTTP operations against allowlisted endpoints with SSRF guards blocking loopback, private IPv4/IPv6, cloud metadata (`169.254.169.254`), and non-standard ports.
+- **`tool_blockchain_query`**: Queries live block numbers, transaction receipts, and account balances on Monad Testnet via JSON-RPC.
+- **`tool_crypto_hasher`**: Computes deterministic Keccak-256 or SHA-256 hashes of string or JSON payloads.
+
+### Recipient-Only Approval Security Guarantee
+- Under Option A, **only the designated recipient wallet (`pact.recipient`)** is permitted to review verified evidence and trigger settlement in the user interface.
+- Creators and third-party wallets cannot release funds on behalf of the recipient in Option A.
+- The Gemini agent has **no access to private keys** and cannot initiate blockchain transactions. All payouts require an interactive MetaMask signature from the human recipient.
 
 ---
 
@@ -276,6 +351,9 @@ cp .env.example .env
 Review the values in `.env`:
 
 ```env
+# Google Gemini API Key (Required for Option A Autonomous Agent)
+GEMINI_API_KEY=your_gemini_api_key_here
+
 # WalletConnect Cloud Project ID (get one at https://cloud.walletconnect.com)
 VITE_WALLETCONNECT_PROJECT_ID=bbb40d5fe835cd83e44d183f8d5c8e38
 
@@ -283,10 +361,18 @@ VITE_WALLETCONNECT_PROJECT_ID=bbb40d5fe835cd83e44d183f8d5c8e38
 VITE_MONAD_RPC_URL=https://testnet-rpc.monad.xyz
 
 # Deployed PactEscrow Contract on Monad Testnet (Chain ID 10143)
-VITE_PACT_ESCROW_ADDRESS=
+VITE_PACT_ESCROW_ADDRESS=0x3d22Dc20a9Ff29Fd4EbbCD5B380e8d641eA577ce
 ```
 
-### 4. Run the Development Server
+### 4. Start the Application
+
+In a terminal, start the backend agent server:
+
+```bash
+npm run server
+```
+
+In a second terminal, start the Vite frontend development server:
 
 ```bash
 npm run dev
@@ -296,7 +382,7 @@ Open your browser at `http://localhost:5173`.
 
 ### 5. Run the Test Suite
 
-Execute the 24 automated tests covering canonical serialization, validator rules, and settlement orchestration:
+Execute the 33 automated tests covering tool sandboxing, manifest compiler bridge, canonical serialization, validator rules, and settlement orchestration:
 
 ```bash
 npm test
@@ -359,11 +445,18 @@ Follow these steps to create and settle a machine agreement:
    - Confirm the transaction in your wallet. Once mined, you will be redirected to the Pact Details view.
 5. **Inspect the Agreement**:
    - View live on-chain status (`Funded`), locked balance, participant addresses, and deadline counter on `/agreement/:id`.
-6. **Provide Evidence & Settle**:
-   - In the **Evidence & Payment** card, click **Provide confirmation to release payment to recipient**.
-   - Veridict verifies the task criteria in real time.
-   - Confirm the settlement transaction in your wallet.
-   - The contract records the evidence hash and immediately disburses the escrowed `MON` to the recipient address.
+6. **Verify & Settle with Option A (Gemini Agent) or Option B (Simulation)**:
+   - **Option A: Autonomous Gemini Agent (Default & Recommended)**:
+     - Click **Run Gemini Agent** in the Evidence & Payment card.
+     - Gemini 3.5 Flash Lite reads the on-chain agreement criteria and executes live tools (`tool_api_caller` to send verified telemetry, `tool_crypto_hasher` to compute deliverable digests).
+     - The ExecutionRecorder captures real traces and compiles an RFC 8785 canonical manifest with a Keccak-256 `evidenceHash`.
+     - The **Veridict Verification Gate** evaluates the evidence deterministically (PASS).
+     - Under the **Recipient-Only Approval Gate**, switch MetaMask to the designated **Recipient wallet** (`pact.recipient`).
+     - Click **Sign & Release Escrow to Recipient** to execute `submitEvidence(pactId, evidenceHash)`. Monad Testnet releases the escrowed `MON` directly to the recipient!
+   - **Option B: Veridict Simulation Testbed**:
+     - Toggle to **Veridict Simulation (Option B)**.
+     - Choose **Valid Proof (PASS)** or **Corrupted Proof (FAIL)** to simulate edge-case invariant behavior.
+     - Click **Provide confirmation to release payment to recipient** to execute the deterministic proof release.
 
 ---
 

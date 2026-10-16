@@ -4,6 +4,18 @@ import tailwindcss from '@tailwindcss/vite'
 import fs from 'fs'
 
 export default defineConfig({
+  server: {
+    proxy: {
+      '/api/agent': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+      '/api/test-telemetry': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
