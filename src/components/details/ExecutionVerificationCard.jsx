@@ -49,9 +49,6 @@ export default function ExecutionVerificationCard({
   } = evidenceState
 
   // Derived user roles
-  const isRecipient = Boolean(
-    userAddress && pact?.recipient && userAddress.toLowerCase() === pact.recipient.toLowerCase()
-  )
   const isCreator = Boolean(
     userAddress && pact?.creator && userAddress.toLowerCase() === pact.creator.toLowerCase()
   )
